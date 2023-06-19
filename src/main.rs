@@ -62,9 +62,46 @@ impl GameState {
 
 impl Board {
     fn new() -> Self {
-        Board {
-            pieces: vec![vec![None; BOARD_WIDTH]; BOARD_HEIGHT],
+        let config = "rnbqkbnr\
+                            pppppppp\
+                            --------\
+                            --------\
+                            --------\
+                            --------\
+                            PPPPPPPP\
+                            RNBQKBNR";
+
+        let mut pieces = vec![vec![None; BOARD_WIDTH]; BOARD_HEIGHT];
+
+        for row in 0..BOARD_HEIGHT {
+            for col in 0..BOARD_HEIGHT {
+                let current = config.as_bytes()[row + col] as char;
+                
+                let piece_type = match current {
+                    '-' => continue,
+                    'r' | 'R' => PieceType::Rook,
+                    'n' | 'N' => PieceType::Knight,
+                    'b' | 'B' => PieceType::Bishop,
+                    'q' | 'Q' => PieceType::Queen,
+                    'k' | 'K' => PieceType::King,
+                    'p' | 'P' => PieceType::Pawn,
+                    other => panic!("invalid board configuration: {other}"),
+                };
+
+                let color = if current.is_lowercase() {
+                    Color::Black
+                } else {
+                    Color::White
+                };
+
+                pieces[row][col] = Some(Piece {
+                    piece_type,
+                    color,
+                });
+            }
         }
+
+        Board { pieces }
     }
 
     fn draw(&self, canvas: &mut graphics::Canvas, (x, y): (f32, f32)) -> GameResult {
