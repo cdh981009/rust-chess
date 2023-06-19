@@ -1,3 +1,5 @@
+use std::fmt::{self, Display};
+
 use ggez::*;
 
 fn main() {
@@ -31,6 +33,31 @@ struct Piece {
     color: Color,
 }
 
+impl fmt::Display for Piece {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use PieceType::*;
+
+        let c = match &self.piece_type {
+            Pawn => 'p',
+            Rook => 'r',
+            Bishop => 'b',
+            Knight => 'n',
+            King => 'k',
+            Queen => 'q',
+        };
+
+        write!(
+            f,
+            "{}",
+            if self.color == Color::White {
+                c.to_uppercase().to_string()
+            } else {
+                c.to_string()
+            }
+        )
+    }
+}
+
 #[derive(Clone)]
 enum PieceType {
     Pawn,
@@ -41,7 +68,7 @@ enum PieceType {
     Queen,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum Color {
     White,
     Black,
@@ -74,9 +101,9 @@ impl Board {
         let mut pieces = vec![vec![None; BOARD_WIDTH]; BOARD_HEIGHT];
 
         for row in 0..BOARD_HEIGHT {
-            for col in 0..BOARD_HEIGHT {
-                let current = config.as_bytes()[row + col] as char;
-                
+            for col in 0..BOARD_WIDTH {
+                let current = config.as_bytes()[row * BOARD_WIDTH + col] as char;
+
                 let piece_type = match current {
                     '-' => continue,
                     'r' | 'R' => PieceType::Rook,
@@ -94,12 +121,25 @@ impl Board {
                     Color::White
                 };
 
-                pieces[row][col] = Some(Piece {
-                    piece_type,
-                    color,
-                });
+                pieces[row][col] = Some(Piece { piece_type, color });
             }
         }
+
+        // this is for debug
+        for row in &pieces {
+            for elem in row {
+                print!(
+                    "{}",
+                    if let Some(piece) = elem {
+                        piece.to_string()
+                    } else {
+                        '_'.to_string()
+                    }
+                );
+            }
+            println!("");
+        }
+        // end
 
         Board { pieces }
     }
@@ -128,6 +168,7 @@ impl Board {
 
         // 2. draw pieces on the board
         // TODO
+        
 
         Ok(())
     }
