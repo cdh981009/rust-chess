@@ -35,16 +35,7 @@ struct Piece {
 
 impl fmt::Display for Piece {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use PieceType::*;
-
-        let c = match &self.piece_type {
-            Pawn => 'p',
-            Rook => 'r',
-            Bishop => 'b',
-            Knight => 'n',
-            King => 'k',
-            Queen => 'q',
-        };
+        let c = self.piece_type.to_string();
 
         write!(
             f,
@@ -68,10 +59,40 @@ enum PieceType {
     Queen,
 }
 
+impl fmt::Display for PieceType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use PieceType::*;
+
+        let c = match self {
+            Pawn => 'p',
+            Rook => 'r',
+            Bishop => 'b',
+            Knight => 'n',
+            King => 'k',
+            Queen => 'q',
+        };
+
+        write!(f, "{c}")
+    }
+}
+
 #[derive(Clone, PartialEq)]
 enum Color {
     White,
     Black,
+}
+
+impl fmt::Display for Color {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Color::*;
+
+        let c = match self {
+            White => 'w',
+            Black => 'b',
+        };
+
+        write!(f, "{c}")
+    }
 }
 
 impl GameState {
@@ -168,7 +189,6 @@ impl Board {
 
         // 2. draw pieces on the board
         // TODO
-        
 
         Ok(())
     }
