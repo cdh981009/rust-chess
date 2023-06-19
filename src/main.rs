@@ -1,11 +1,23 @@
-use std::fmt;
+use std::{env, fmt, path};
 
-use ggez::{graphics::Image, *};
+use ggez::{glam::Vec2, graphics::Image, mint::Point2, *};
 
 fn main() -> GameResult {
+    // We add the CARGO_MANIFEST_DIR/resources to the resource paths
+    // so that ggez will look in our cargo project directory for files.
+    let resource_dir = if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+        let mut path = path::PathBuf::from(manifest_dir);
+        path.push("resources");
+        path
+    } else {
+        path::PathBuf::from("./resources")
+    };
+
     let c = conf::Conf::new();
     let (mut ctx, event_loop) = ContextBuilder::new("rust_chess", "cdh981009")
         .default_conf(c)
+        .add_resource_path(resource_dir)
+        .window_mode(conf::WindowMode::default().dimensions(800.0, 800.0))
         .build()
         .unwrap();
 
@@ -25,9 +37,9 @@ impl Assets {
         let pieces = "prbnkq";
         let colors = "wb";
 
-        for piece in pieces.chars() {
-            for color in colors.chars() {
-                let path = format!("/{color}{piece}");
+        for color in colors.chars() {
+            for piece in pieces.chars() {
+                let path = format!("/{color}{piece}.png");
                 piece_images.push(Image::from_path(ctx, path)?);
             }
         }
@@ -46,6 +58,8 @@ struct GameState {
 const BOARD_WIDTH: usize = 8;
 const BOARD_HEIGHT: usize = 8;
 
+const PIECE_TYPES: usize = 6;
+
 struct Board {
     pieces: Vec<Vec<Option<Piece>>>,
 }
@@ -54,6 +68,15 @@ struct Board {
 struct Piece {
     piece_type: PieceType,
     color: Color,
+}
+
+impl Piece {
+    fn get_image<'a>(&self, assets: &'a Assets) -> &'a Image {
+        let piece_type: usize = (self.piece_type as u64).try_into().unwrap();
+        let color: usize = (self.color as u64).try_into().unwrap();
+
+        &(assets.piece_images[color * PIECE_TYPES + piece_type])
+    }
 }
 
 impl fmt::Display for Piece {
@@ -72,7 +95,7 @@ impl fmt::Display for Piece {
     }
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 enum PieceType {
     Pawn,
     Rook,
@@ -99,7 +122,7 @@ impl fmt::Display for PieceType {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 enum Color {
     White,
     Black,
@@ -128,7 +151,7 @@ impl GameState {
             screen_width,
             screen_height,
             board,
-            assets,  
+            assets,
         })
     }
 }
@@ -190,8 +213,13 @@ impl Board {
         Board { pieces }
     }
 
-    fn draw(&self, canvas: &mut graphics::Canvas, (x, y): (f32, f32)) -> GameResult {
-        let cell_size = 50.0;
+    fn draw(
+        &self,
+        canvas: &mut graphics::Canvas,
+        assets: &Assets,
+        (x, y): (f32, f32),
+    ) -> GameResult {
+        let cell_size = 80.0;
 
         // 1. draw board
         for i in 0..BOARD_HEIGHT {
@@ -212,8 +240,29 @@ impl Board {
             }
         }
 
+        let sprite_original_size = 440.0;
         // 2. draw pieces on the board
-        // TODO
+        for i in 0..BOARD_HEIGHT {
+            for j in 0..BOARD_WIDTH {
+                if let Some(piece) = &self.pieces[i][j] {
+                    let pos: Vec2 =
+                        <[f32; 2] as Into<Vec2>>::into([
+                            x + cell_size * j as f32,
+                            y + cell_size * i as f32,
+                        ]) + <[f32; 2] as Into<Vec2>>::into([cell_size / 2.0, cell_size / 2.0]);
+
+                    let image = piece.get_image(assets);
+                    let drawparams = graphics::DrawParam::new()
+                        .dest(pos)
+                        .offset([0.5, 0.5])
+                        .scale([
+                            cell_size / sprite_original_size,
+                            cell_size / sprite_original_size,
+                        ]);
+                    canvas.draw(image, drawparams);
+                }
+            }
+        }
 
         Ok(())
     }
@@ -226,9 +275,9 @@ impl ggez::event::EventHandler<GameError> for GameState {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         let mut canvas = graphics::Canvas::from_frame(ctx, graphics::Color::BLUE);
-        let offset = (100.0, 100.0);
+        let offset = (80.0, 80.0);
 
-        self.board.draw(&mut canvas, offset)?;
+        self.board.draw(&mut canvas, &self.assets, offset)?;
 
         canvas.finish(ctx)?;
 
