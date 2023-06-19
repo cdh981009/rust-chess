@@ -1,23 +1,46 @@
-use std::fmt::{self, Display};
+use std::fmt;
 
-use ggez::*;
+use ggez::{graphics::Image, *};
 
-fn main() {
+fn main() -> GameResult {
     let c = conf::Conf::new();
-    let (ctx, event_loop) = ContextBuilder::new("rust_chess", "cdh981009")
+    let (mut ctx, event_loop) = ContextBuilder::new("rust_chess", "cdh981009")
         .default_conf(c)
         .build()
         .unwrap();
 
-    let state = GameState::new(&ctx);
+    let state = GameState::new(&mut ctx)?;
 
     event::run(ctx, event_loop, state);
+}
+
+struct Assets {
+    piece_images: Vec<Image>,
+}
+
+impl Assets {
+    fn new(ctx: &mut Context) -> GameResult<Assets> {
+        let mut piece_images = Vec::new();
+
+        let pieces = "prbnkq";
+        let colors = "wb";
+
+        for piece in pieces.chars() {
+            for color in colors.chars() {
+                let path = format!("/{color}{piece}");
+                piece_images.push(Image::from_path(ctx, path)?);
+            }
+        }
+
+        Ok(Assets { piece_images })
+    }
 }
 
 struct GameState {
     screen_width: f32,
     screen_height: f32,
     board: Board,
+    assets: Assets,
 }
 
 const BOARD_WIDTH: usize = 8;
@@ -96,15 +119,17 @@ impl fmt::Display for Color {
 }
 
 impl GameState {
-    fn new(ctx: &Context) -> GameState {
+    fn new(ctx: &mut Context) -> GameResult<GameState> {
         let (screen_width, screen_height) = ctx.gfx.drawable_size();
         let board = Board::new();
+        let assets = Assets::new(ctx)?;
 
-        GameState {
+        Ok(GameState {
             screen_width,
             screen_height,
             board,
-        }
+            assets,  
+        })
     }
 }
 
