@@ -1,26 +1,26 @@
+use std::collections::HashMap;
+
 use ggez::{graphics::Image, *};
 
 use crate::board::*;
 
 pub struct Assets {
-    pub piece_images: Vec<Image>,
+    images: HashMap<String, Image>,
 }
 
 impl Assets {
-    fn new(ctx: &mut Context) -> GameResult<Assets> {
-        let mut piece_images = Vec::new();
+    fn new(ctx: &mut Context) -> Assets {
+        let images = HashMap::new();
+        Assets { images }
+    }
 
-        let pieces = "prbnkq";
-        let colors = "wb";
-
-        for color in colors.chars() {
-            for piece in pieces.chars() {
-                let path = format!("/{color}{piece}.png");
-                piece_images.push(Image::from_path(ctx, path)?);
-            }
+    pub fn try_get_image(&mut self, ctx: &mut Context, key: &String) -> GameResult<&Image> {
+        if !self.images.contains_key(key) {
+            let path = format!("/{key}.png");
+            self.images.insert(key.clone(), Image::from_path(ctx, path)?);
         }
 
-        Ok(Assets { piece_images })
+        Ok( self.images.get(key).expect("cannot load the image") )
     }
 }
 
@@ -35,7 +35,7 @@ impl GameState {
     pub fn new(ctx: &mut Context) -> GameResult<GameState> {
         let (screen_width, screen_height) = ctx.gfx.drawable_size();
         let board = Board::new();
-        let assets = Assets::new(ctx)?;
+        let assets = Assets::new(ctx);
 
         Ok(GameState {
             screen_width,
@@ -55,7 +55,7 @@ impl ggez::event::EventHandler<GameError> for GameState {
         let mut canvas = graphics::Canvas::from_frame(ctx, graphics::Color::WHITE);
         let offset = (80.0, 80.0);
 
-        self.board.draw(&mut canvas, &self.assets, offset)?;
+        self.board.draw(ctx, &mut canvas, &mut self.assets, offset)?;
 
         canvas.finish(ctx)?;
 

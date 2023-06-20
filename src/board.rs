@@ -76,14 +76,15 @@ impl Board {
 
     pub fn draw(
         &self,
+        ctx: &mut Context,
         canvas: &mut graphics::Canvas,
-        assets: &Assets,
+        assets: &mut Assets,
         (x, y): (f32, f32),
     ) -> GameResult {
         let cell_size = 80.0;
 
         self.draw_board(canvas, (x, y), cell_size);
-        self.draw_pieces(canvas, assets, (x, y), cell_size);
+        self.draw_pieces(ctx, canvas, assets, (x, y), cell_size);
 
         Ok(())
     }
@@ -110,8 +111,9 @@ impl Board {
 
     fn draw_pieces(
         &self,
+        ctx: &mut Context,
         canvas: &mut graphics::Canvas,
-        assets: &Assets,
+        assets: &mut Assets,
         (x, y): (f32, f32),
         cell_size: f32,
     ) {
@@ -127,7 +129,7 @@ impl Board {
                             y + cell_size * i as f32,
                         ]) + <[f32; 2] as Into<Vec2>>::into([cell_size / 2.0, cell_size / 2.0]);
 
-                    let image = piece.get_image(assets);
+                    let image = piece.get_image(ctx, assets);
                     let drawparams = graphics::DrawParam::new()
                         .dest(pos)
                         .offset([0.5, 0.5])  // offset so that the sprite center and the drawing position align
@@ -149,11 +151,10 @@ struct Piece {
 }
 
 impl Piece {
-    fn get_image<'a>(&self, assets: &'a Assets) -> &'a Image {
-        let piece_type: usize = (self.piece_type as u64).try_into().unwrap();
-        let color: usize = (self.color as u64).try_into().unwrap();
+    fn get_image<'a>(&self, ctx: &mut Context, assets: &'a mut Assets) -> &'a Image {
+        let sprite = self.color.to_string() + &self.piece_type.to_string();
 
-        &(assets.piece_images[color * PIECE_TYPES + piece_type])
+        assets.try_get_image(ctx, &sprite).unwrap()
     }
 }
 
