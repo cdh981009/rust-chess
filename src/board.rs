@@ -82,13 +82,19 @@ impl Board {
     ) -> GameResult {
         let cell_size = 80.0;
 
-        // 1. draw board
+        self.draw_board(canvas, (x, y), cell_size);
+        self.draw_pieces(canvas, assets, (x, y), cell_size);
+
+        Ok(())
+    }
+
+    fn draw_board(&self, canvas: &mut graphics::Canvas, (x, y): (f32, f32), cell_size: f32) {
         for i in 0..BOARD_HEIGHT {
             for j in 0..BOARD_WIDTH {
                 let color = if (i + j) % 2 == 0 {
-                    graphics::Color::from_rgb_u32(0x9699A1)
+                    graphics::Color::from_rgb_u32(0x9699A1) // light color
                 } else {
-                    graphics::Color::from_rgb_u32(0x434347)
+                    graphics::Color::from_rgb_u32(0x434347) // dark color
                 };
 
                 canvas.draw(
@@ -100,12 +106,21 @@ impl Board {
                 );
             }
         }
+    }
 
-        let sprite_original_size = 440.0;
-        // 2. draw pieces on the board
+    fn draw_pieces(
+        &self,
+        canvas: &mut graphics::Canvas,
+        assets: &Assets,
+        (x, y): (f32, f32),
+        cell_size: f32,
+    ) {
+        let sprite_original_size = 460.0;
+
         for i in 0..BOARD_HEIGHT {
             for j in 0..BOARD_WIDTH {
                 if let Some(piece) = &self.pieces[i][j] {
+                    // set pos to the center of the cell
                     let pos: Vec2 =
                         <[f32; 2] as Into<Vec2>>::into([
                             x + cell_size * j as f32,
@@ -115,7 +130,7 @@ impl Board {
                     let image = piece.get_image(assets);
                     let drawparams = graphics::DrawParam::new()
                         .dest(pos)
-                        .offset([0.5, 0.5])
+                        .offset([0.5, 0.5])  // offset so that the sprite center and the drawing position align
                         .scale([
                             cell_size / sprite_original_size,
                             cell_size / sprite_original_size,
@@ -124,8 +139,6 @@ impl Board {
                 }
             }
         }
-
-        Ok(())
     }
 }
 
