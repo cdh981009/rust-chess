@@ -86,9 +86,9 @@ impl Board {
         for i in 0..BOARD_HEIGHT {
             for j in 0..BOARD_WIDTH {
                 let color = if (i + j) % 2 == 0 {
-                    graphics::Color::WHITE
+                    graphics::Color::from_rgb_u32(0x9699A1)
                 } else {
-                    graphics::Color::BLACK
+                    graphics::Color::from_rgb_u32(0x434347)
                 };
 
                 canvas.draw(

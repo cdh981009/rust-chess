@@ -52,7 +52,7 @@ impl ggez::event::EventHandler<GameError> for GameState {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        let mut canvas = graphics::Canvas::from_frame(ctx, graphics::Color::BLUE);
+        let mut canvas = graphics::Canvas::from_frame(ctx, graphics::Color::WHITE);
         let offset = (80.0, 80.0);
 
         self.board.draw(&mut canvas, &self.assets, offset)?;
