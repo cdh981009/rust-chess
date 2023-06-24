@@ -92,11 +92,14 @@ impl Board {
     fn draw_board(&self, canvas: &mut graphics::Canvas, (x, y): (f32, f32), cell_size: f32) {
         for i in 0..BOARD_HEIGHT {
             for j in 0..BOARD_WIDTH {
-                let color = if (i + j) % 2 == 0 {
-                    graphics::Color::from_rgb_u32(0x9699A1) // light color
+                let light_color = 0x9699A1;
+                let dark_color = 0x434347;
+
+                let color = graphics::Color::from_rgb_u32(if (i + j) % 2 == 0 {
+                    light_color
                 } else {
-                    graphics::Color::from_rgb_u32(0x434347) // dark color
-                };
+                    dark_color
+                });
 
                 canvas.draw(
                     &graphics::Quad,
