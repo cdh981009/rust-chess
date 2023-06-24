@@ -15,10 +15,14 @@ const PIECE_TYPES: usize = 6;
 
 pub struct Board {
     pieces: Vec<Vec<Option<Piece>>>,
+    selected: Option<(usize, usize)>,
+    x: f32,
+    y: f32,
+    cell_size: f32,
 }
 
 impl Board {
-    pub fn new() -> Self {
+    pub fn new((x, y): (f32, f32)) -> Self {
         let config = "rnbqkbnr\
                             pppppppp\
                             --------\
@@ -71,20 +75,30 @@ impl Board {
         }
         // end
 
-        Board { pieces }
+        let selected = None;
+        let cell_size = 80.0;
+
+        Board {
+            pieces,
+            selected,
+            x,
+            y,
+            cell_size,
+        }
     }
+
+    pub fn update(&mut self, mouse: &Mouse) {}
 
     pub fn draw(
         &self,
         ctx: &mut Context,
         canvas: &mut graphics::Canvas,
         assets: &mut Assets,
-        (x, y): (f32, f32),
     ) -> GameResult {
-        let cell_size = 80.0;
+        let (x, y) = (self.x, self.y);
 
-        self.draw_board(canvas, (x, y), cell_size);
-        self.draw_pieces(ctx, canvas, assets, (x, y), cell_size);
+        self.draw_board(canvas, (x, y), self.cell_size);
+        self.draw_pieces(ctx, canvas, assets, (x, y), self.cell_size);
 
         Ok(())
     }
@@ -135,7 +149,7 @@ impl Board {
                     let image = piece.get_image(ctx, assets);
                     let drawparams = graphics::DrawParam::new()
                         .dest(pos)
-                        .offset([0.5, 0.5])  // offset so that the sprite center and the drawing position align
+                        .offset([0.5, 0.5]) // offset so that the sprite center and the drawing position align
                         .scale([
                             cell_size / sprite_original_size,
                             cell_size / sprite_original_size,

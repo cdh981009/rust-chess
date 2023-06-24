@@ -68,7 +68,10 @@ pub struct GameState {
 impl GameState {
     pub fn new(ctx: &mut Context) -> GameResult<GameState> {
         let (screen_width, screen_height) = ctx.gfx.drawable_size();
-        let board = Board::new();
+
+        let board_position = (80.0, 80.0);
+        let board = Board::new(board_position);
+        
         let assets = Assets::new(ctx);
         let mouse = Default::default();
 
@@ -85,6 +88,7 @@ impl GameState {
 impl ggez::event::EventHandler<GameError> for GameState {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         // update things here:
+        self.board.update(&self.mouse);
 
         // update mouse at the last moment
         self.mouse.update();
@@ -94,10 +98,9 @@ impl ggez::event::EventHandler<GameError> for GameState {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         let mut canvas = graphics::Canvas::from_frame(ctx, graphics::Color::WHITE);
-        let offset = (80.0, 80.0);
 
         self.board
-            .draw(ctx, &mut canvas, &mut self.assets, offset)?;
+            .draw(ctx, &mut canvas, &mut self.assets)?;
 
         canvas.finish(ctx)?;
 
