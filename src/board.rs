@@ -166,15 +166,15 @@ impl Board {
         cell_size: f32,
     ) {
         let sprite_original_size = 460.0;
-
-        for i in 0..BOARD_HEIGHT {
-            for j in 0..BOARD_WIDTH {
-                if let Some(piece) = &self.pieces[i][j] {
+        
+        for cell_x in 0..BOARD_WIDTH {
+            for cell_y in 0..BOARD_HEIGHT {
+                if let Some(piece) = &self.pieces[cell_y][cell_x] {
                     // set pos to the center of the cell
                     let pos: Vec2 =
                         <[f32; 2] as Into<Vec2>>::into([
-                            x + cell_size * j as f32,
-                            y + cell_size * i as f32,
+                            x + cell_size * cell_x as f32,
+                            y + cell_size * cell_y as f32,
                         ]) + <[f32; 2] as Into<Vec2>>::into([cell_size / 2.0, cell_size / 2.0]);
 
                     let image = piece.get_image(ctx, assets);
