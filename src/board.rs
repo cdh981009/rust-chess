@@ -87,7 +87,32 @@ impl Board {
         }
     }
 
-    pub fn update(&mut self, mouse: &Mouse) {}
+    fn is_position_in_bound(&self, (x, y): (i32, i32)) -> bool {
+        x >= 0
+            && x < self.pieces[0].len().try_into().unwrap()
+            && y >= 0
+            && y < self.pieces.len().try_into().unwrap()
+    }
+
+    fn select_cell(&mut self, mouse: &Mouse) -> Option<(usize, usize)> {
+        let (mx, my) = mouse.get_mouse();
+        let (mx_rel, my_rel) = ((mx - self.x).floor(), (my - self.y).floor());
+
+        let x = (mx_rel / self.cell_size) as i32;
+        let y = (my_rel / self.cell_size) as i32;
+
+        if self.is_position_in_bound((x, y)) {
+            return Some((x as usize, y as usize));
+        }
+
+        None
+    }
+
+    pub fn update(&mut self, mouse: &Mouse) {
+        if mouse.is_mouse_pressed() {
+            self.selected = self.select_cell(mouse);
+        }
+    }
 
     pub fn draw(
         &self,
@@ -104,24 +129,30 @@ impl Board {
     }
 
     fn draw_board(&self, canvas: &mut graphics::Canvas, (x, y): (f32, f32), cell_size: f32) {
-        for i in 0..BOARD_HEIGHT {
-            for j in 0..BOARD_WIDTH {
-                let light_color = 0x9699A1;
-                let dark_color = 0x434347;
+        let light_color = graphics::Color::from_rgb_u32(0x9699A1);
+        let dark_color = graphics::Color::from_rgb_u32(0x434347);
+        let select_color = graphics::Color::from_rgba_u32(0xFF000066);
 
-                let color = graphics::Color::from_rgb_u32(if (i + j) % 2 == 0 {
+        for cell_x in 0..BOARD_WIDTH {
+            for cell_y in 0..BOARD_HEIGHT {
+                let color = if (cell_x + cell_y) % 2 == 0 {
                     light_color
                 } else {
                     dark_color
-                });
+                };
 
-                canvas.draw(
-                    &graphics::Quad,
-                    graphics::DrawParam::default()
-                        .color(color)
-                        .scale([cell_size, cell_size])
-                        .dest([x + cell_size * j as f32, y + cell_size * i as f32]),
-                );
+                let pos = [x + cell_size * cell_x as f32, y + cell_size * cell_y as f32];
+                let scale = [cell_size, cell_size];
+                let param = graphics::DrawParam::default().scale(scale).dest(pos);
+
+                canvas.draw(&graphics::Quad, param.color(color));
+
+                if self
+                    .selected
+                    .is_some_and(|(sx, sy)| (sx, sy) == (cell_x, cell_y))
+                {
+                    canvas.draw(&graphics::Quad, param.color(select_color));
+                }
             }
         }
     }

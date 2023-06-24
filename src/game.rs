@@ -71,7 +71,7 @@ impl GameState {
 
         let board_position = (80.0, 80.0);
         let board = Board::new(board_position);
-        
+
         let assets = Assets::new(ctx);
         let mouse = Default::default();
 
@@ -115,7 +115,8 @@ impl ggez::event::EventHandler<GameError> for GameState {
         y: f32,
     ) -> GameResult {
         self.mouse.is_mouse_down = true;
-        println!("Mouse button pressed: {button:?}, x: {x}, y: {y}");
+        self.mouse.is_mouse_pressed = true;
+        // println!("Mouse button pressed: {button:?}, x: {x}, y: {y}");
 
         Ok(())
     }
@@ -128,7 +129,7 @@ impl ggez::event::EventHandler<GameError> for GameState {
         y: f32,
     ) -> GameResult {
         self.mouse.is_mouse_down = false;
-        println!("Mouse button released: {button:?}, x: {x}, y: {y}");
+        // println!("Mouse button released: {button:?}, x: {x}, y: {y}");
 
         Ok(())
     }
@@ -152,7 +153,7 @@ impl ggez::event::EventHandler<GameError> for GameState {
         self.pos_x = (x / (size.width  as f32)) * screen_rect.w + screen_rect.x;
         self.pos_y = (y / (size.height as f32)) * screen_rect.h + screen_rect.y;
         */
-        println!("Mouse motion, x: {x}, y: {y}, relative x: {xrel}, relative y: {yrel}");
+        // println!("Mouse motion, x: {x}, y: {y}, relative x: {xrel}, relative y: {yrel}");
         Ok(())
     }
 }
