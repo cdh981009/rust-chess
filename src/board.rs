@@ -11,8 +11,6 @@ use crate::game::*;
 const BOARD_WIDTH: usize = 8;
 const BOARD_HEIGHT: usize = 8;
 
-const PIECE_TYPES: usize = 6;
-
 pub struct Board {
     pieces: Vec<Vec<Option<Piece>>>,
     selected: Option<(usize, usize)>,
@@ -339,7 +337,6 @@ impl Board {
             Rook => self.compute_rook_moves(piece, (x, y), &mut moves),
             Queen => self.compute_queen_moves(piece, (x, y), &mut moves),
             King => self.compute_king_moves(piece, (x, y), &mut moves),
-            _ => panic!("invalid piece type"),
         }
 
         moves
