@@ -343,7 +343,7 @@ impl Board {
     }
 
     pub fn update(&mut self, mouse: &Mouse) {
-        if mouse.is_mouse_pressed() {
+        if mouse.is_mouse_pressed(event::MouseButton::Left) {
             self.selected = self.select_cell(mouse);
 
             self.highlight_positions = if let Some((x, y)) = self.selected {

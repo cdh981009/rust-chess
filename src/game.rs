@@ -29,31 +29,36 @@ impl Assets {
 pub struct Mouse {
     x: f32,
     y: f32,
-    is_mouse_down: bool,
-    is_mouse_pressed: bool,
-    is_mouse_released: bool,
+    is_mouse_down: HashMap<MouseButton, bool>,
+    is_mouse_pressed: HashMap<MouseButton, bool>,
+    is_mouse_released: HashMap<MouseButton, bool>,
 }
 
 impl Mouse {
     fn update(&mut self) {
-        self.is_mouse_pressed = false;
-        self.is_mouse_released = false;
+        for (key, val) in self.is_mouse_pressed.iter_mut() {
+            *val = false;
+        }
+
+        for (key, val) in self.is_mouse_released.iter_mut() {
+            *val = false;
+        }
     }
 
     pub fn get_mouse(&self) -> (f32, f32) {
         (self.x, self.y)
     }
 
-    pub fn is_mouse_down(&self) -> bool {
-        self.is_mouse_down
+    pub fn is_mouse_down(&self, mouse_button: MouseButton) -> bool {
+        *self.is_mouse_down.get(&mouse_button).unwrap_or(&false)
     }
 
-    pub fn is_mouse_pressed(&self) -> bool {
-        self.is_mouse_pressed
+    pub fn is_mouse_pressed(&self, mouse_button: MouseButton) -> bool {
+        *self.is_mouse_pressed.get(&mouse_button).unwrap_or(&false)
     }
 
-    pub fn is_mouse_released(&self) -> bool {
-        self.is_mouse_released
+    pub fn is_mouse_released(&self, mouse_button: MouseButton) -> bool {
+        *self.is_mouse_released.get(&mouse_button).unwrap_or(&false)
     }
 }
 
@@ -114,8 +119,8 @@ impl ggez::event::EventHandler<GameError> for GameState {
         x: f32,
         y: f32,
     ) -> GameResult {
-        self.mouse.is_mouse_down = true;
-        self.mouse.is_mouse_pressed = true;
+        self.mouse.is_mouse_down.insert(button, true);
+        self.mouse.is_mouse_pressed.insert(button, true);
         // println!("Mouse button pressed: {button:?}, x: {x}, y: {y}");
 
         Ok(())
@@ -128,7 +133,7 @@ impl ggez::event::EventHandler<GameError> for GameState {
         x: f32,
         y: f32,
     ) -> GameResult {
-        self.mouse.is_mouse_down = false;
+        self.mouse.is_mouse_down.insert(button, false);
         // println!("Mouse button released: {button:?}, x: {x}, y: {y}");
 
         Ok(())
