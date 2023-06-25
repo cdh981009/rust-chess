@@ -162,6 +162,169 @@ impl Board {
         }
     }
 
+    fn compute_knight_moves(
+        &self,
+        piece: &Piece,
+        (x, y): (usize, usize),
+        moves: &mut Vec<(usize, usize)>,
+    ) {
+        static DIRS: [(i32, i32); 8] = [
+            (-2, -1),
+            (-2, 1),
+            (2, -1),
+            (2, 1),
+            (-1, -2),
+            (-1, 2),
+            (1, -2),
+            (1, 2),
+        ];
+
+        let enemy_color = if piece.color == Color::White {
+            Color::Black
+        } else {
+            Color::White
+        };
+
+        for (move_x, move_y) in DIRS {
+            let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
+
+            if self.is_position_in_bound((nx, ny))
+                && (self.is_empty((nx as usize, ny as usize))
+                    || self.is_color((nx as usize, ny as usize), enemy_color))
+            {
+                moves.push((nx as usize, ny as usize));
+            }
+        }
+    }
+
+    fn compute_bishop_moves(
+        &self,
+        piece: &Piece,
+        (x, y): (usize, usize),
+        moves: &mut Vec<(usize, usize)>,
+    ) {
+        self.compute_diagonal_moves(piece, (x, y), moves)
+    }
+
+    fn compute_rook_moves(
+        &self,
+        piece: &Piece,
+        (x, y): (usize, usize),
+        moves: &mut Vec<(usize, usize)>,
+    ) {
+        self.compute_orthogonal_moves(piece, (x, y), moves)
+    }
+
+    fn compute_queen_moves(
+        &self,
+        piece: &Piece,
+        (x, y): (usize, usize),
+        moves: &mut Vec<(usize, usize)>,
+    ) {
+        self.compute_diagonal_moves(piece, (x, y), moves);
+        self.compute_orthogonal_moves(piece, (x, y), moves);
+    }
+
+    fn compute_king_moves(
+        &self,
+        piece: &Piece,
+        (x, y): (usize, usize),
+        moves: &mut Vec<(usize, usize)>,
+    ) {
+        // todo: castling
+
+        let enemy_color = if piece.color == Color::White {
+            Color::Black
+        } else {
+            Color::White
+        };
+
+        for move_x in -1..=1 {
+            for move_y in -1..=1 {
+                if (move_x, move_y) == (0, 0) {
+                    continue;
+                }
+
+                let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
+
+                if self.is_position_in_bound((nx, ny))
+                    && (self.is_empty((nx as usize, ny as usize))
+                        || self.is_color((nx as usize, ny as usize), enemy_color))
+                {
+                    moves.push((nx as usize, ny as usize));
+                }
+            }
+        }
+    }
+
+    fn compute_moves_in_direction(
+        &self,
+        enemy_color: Color,
+        (x, y): (usize, usize),
+        (x_dir, y_dir): (i32, i32),
+        moves: &mut Vec<(usize, usize)>,
+    ) {
+        let (mut nx, mut ny) = (x as i32, y as i32);
+
+        loop {
+            nx += x_dir;
+            ny += y_dir;
+
+            if !self.is_position_in_bound((nx, ny)) {
+                break;
+            }
+
+            let is_empty = self.is_empty((nx as usize, ny as usize));
+            let is_enemy = self.is_color((nx as usize, ny as usize), enemy_color);
+
+            if is_empty || is_enemy {
+                moves.push((nx as usize, ny as usize));
+            }
+
+            if !is_empty {
+                break;
+            }
+        }
+    }
+
+    fn compute_orthogonal_moves(
+        &self,
+        piece: &Piece,
+        (x, y): (usize, usize),
+        moves: &mut Vec<(usize, usize)>,
+    ) {
+        static DIRS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+
+        let enemy_color = if piece.color == Color::White {
+            Color::Black
+        } else {
+            Color::White
+        };
+
+        for (x_dir, y_dir) in DIRS {
+            self.compute_moves_in_direction(enemy_color, (x, y), (x_dir, y_dir), moves);
+        }
+    }
+
+    fn compute_diagonal_moves(
+        &self,
+        piece: &Piece,
+        (x, y): (usize, usize),
+        moves: &mut Vec<(usize, usize)>,
+    ) {
+        let enemy_color = if piece.color == Color::White {
+            Color::Black
+        } else {
+            Color::White
+        };
+
+        for x_dir in [-1, 1] {
+            for y_dir in [-1, 1] {
+                self.compute_moves_in_direction(enemy_color, (x, y), (x_dir, y_dir), moves);
+            }
+        }
+    }
+
     fn compute_moves_from(&self, (x, y): (usize, usize)) -> Vec<(usize, usize)> {
         let Some(piece) = &self.pieces[y][x] else { return vec![]; };
 
@@ -171,7 +334,12 @@ impl Board {
 
         match piece.piece_type {
             Pawn => self.compute_pawn_moves(piece, (x, y), &mut moves),
-            _ => {}
+            Knight => self.compute_knight_moves(piece, (x, y), &mut moves),
+            Bishop => self.compute_bishop_moves(piece, (x, y), &mut moves),
+            Rook => self.compute_rook_moves(piece, (x, y), &mut moves),
+            Queen => self.compute_queen_moves(piece, (x, y), &mut moves),
+            King => self.compute_king_moves(piece, (x, y), &mut moves),
+            _ => panic!("invalid piece type"),
         }
 
         moves
@@ -233,7 +401,10 @@ impl Board {
         }
 
         for (cell_x, cell_y) in self.highlight_positions.iter() {
-            let pos = [x + cell_size * *cell_x as f32, y + cell_size * *cell_y as f32];
+            let pos = [
+                x + cell_size * *cell_x as f32,
+                y + cell_size * *cell_y as f32,
+            ];
             let param = graphics::DrawParam::default().scale(scale).dest(pos);
 
             canvas.draw(&graphics::Quad, param.color(select_color));
