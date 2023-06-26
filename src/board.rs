@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, mem::swap};
 
 use ggez::{
     glam::Vec2,
@@ -342,14 +342,32 @@ impl Board {
         moves
     }
 
+    fn move_piece(&mut self, from: (usize, usize), to: (usize, usize)) {
+        let mut src = self.pieces[from.1][from.0];
+
+        let Some(src_piece) = &mut src else { panic!("{:?} should contain a piece", from) };
+
+        src_piece.has_moved = true;
+        self.pieces[from.1][from.0] = None;
+        self.pieces[to.1][to.0] = src;
+    }
+
     pub fn update(&mut self, mouse: &Mouse) {
         if mouse.is_mouse_pressed(event::MouseButton::Left) {
-            self.selected = self.select_cell(mouse);
+            let selected_cell = self.select_cell(mouse);
 
-            self.highlight_positions = if let Some((x, y)) = self.selected {
-                self.compute_moves_from((x, y))
+            if let Some((x, y)) = selected_cell {
+                // valid cell is selected
+                if self.selected.is_some() && self.highlight_positions.contains(&(x, y)) {
+                    self.move_piece(self.selected.unwrap(), (x, y));
+                    self.highlight_positions = Vec::new();
+                    self.selected = None;
+                } else {
+                    self.highlight_positions = self.compute_moves_from((x, y));
+                    self.selected = selected_cell;
+                }
             } else {
-                Vec::new()
+                self.highlight_positions = Vec::new();
             };
         }
     }
@@ -443,7 +461,7 @@ impl Board {
     }
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 struct Piece {
     piece_type: PieceType,
     color: Color,
