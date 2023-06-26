@@ -101,7 +101,7 @@ impl Board {
         self
     }
 
-    fn is_position_in_bound(&self, (x, y): (i32, i32)) -> bool {
+    fn is_position_in_bound((x, y): (i32, i32)) -> bool {
         x >= 0 && x < BOARD_WIDTH as i32 && y >= 0 && y < BOARD_HEIGHT as i32
     }
 
@@ -120,7 +120,7 @@ impl Board {
 
         let (x, y) = (m_cell.x as i32, m_cell.y as i32);
 
-        if self.is_position_in_bound((x, y)) {
+        if Board::is_position_in_bound((x, y)) {
             return Some((x as usize, y as usize));
         }
 
@@ -144,7 +144,7 @@ impl Board {
         for move_y in 1..=reach {
             let (nx, ny) = (x as i32, y as i32 + move_y * y_direction);
 
-            if self.is_position_in_bound((nx, ny)) && self.is_empty_on((nx as usize, ny as usize)) {
+            if Board::is_position_in_bound((nx, ny)) && self.is_empty_on((nx as usize, ny as usize)) {
                 moves.push((nx as usize, ny as usize));
             } else {
                 break;
@@ -161,7 +161,7 @@ impl Board {
         for move_x in [-1, 1] {
             let (nx, ny) = (x as i32 + move_x, y as i32 + y_direction);
 
-            if self.is_position_in_bound((nx, ny))
+            if Board::is_position_in_bound((nx, ny))
                 && self.is_color_on((nx as usize, ny as usize), enemy_color)
             {
                 moves.push((nx as usize, ny as usize));
@@ -195,7 +195,7 @@ impl Board {
         for (move_x, move_y) in DIRS {
             let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
 
-            if self.is_position_in_bound((nx, ny))
+            if Board::is_position_in_bound((nx, ny))
                 && (self.is_empty_on((nx as usize, ny as usize))
                     || self.is_color_on((nx as usize, ny as usize), enemy_color))
             {
@@ -254,7 +254,7 @@ impl Board {
 
                 let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
 
-                if self.is_position_in_bound((nx, ny))
+                if Board::is_position_in_bound((nx, ny))
                     && (self.is_empty_on((nx as usize, ny as usize))
                         || self.is_color_on((nx as usize, ny as usize), enemy_color))
                 {
@@ -277,7 +277,7 @@ impl Board {
             nx += x_dir;
             ny += y_dir;
 
-            if !self.is_position_in_bound((nx, ny)) {
+            if !Board::is_position_in_bound((nx, ny)) {
                 break;
             }
 
