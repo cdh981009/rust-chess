@@ -1,21 +1,17 @@
 use crate::board::*;
 
-pub fn get_moves(pos: (usize, usize), board: &Board) -> [bool; BOARD_WIDTH * BOARD_HEIGHT] {
-    let mut moves = [false; BOARD_WIDTH * BOARD_HEIGHT];
-
-    let Some(piece) = &board.get_piece(pos) else { return moves };
+pub fn get_moves(pos: (usize, usize), board: &Board, moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT]) {
+    let Some(piece) = &board.get_piece(pos) else { return };
 
     use PieceType::*;
     match piece.get_piece_type() {
-        Pawn => get_pawn_moves(piece, pos, board, &mut moves),
-        Knight => get_knight_moves(piece, pos, board, &mut moves),
-        Bishop => get_bishop_moves(piece, pos, board, &mut moves),
-        Rook => get_rook_moves(piece, pos, board, &mut moves),
-        Queen => get_queen_moves(piece, pos, board, &mut moves),
-        King => get_king_moves(piece, pos, board, &mut moves),
+        Pawn => get_pawn_moves(piece, pos, board, moves),
+        Knight => get_knight_moves(piece, pos, board, moves),
+        Bishop => get_bishop_moves(piece, pos, board, moves),
+        Rook => get_rook_moves(piece, pos, board, moves),
+        Queen => get_queen_moves(piece, pos, board, moves),
+        King => get_king_moves(piece, pos, board, moves),
     }
-
-    moves
 }
 
 fn get_pawn_moves(

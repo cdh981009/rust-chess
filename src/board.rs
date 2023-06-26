@@ -146,22 +146,22 @@ impl Board {
         if mouse.is_mouse_pressed(event::MouseButton::Left) {
             let selected_cell = self.try_select_cell(mouse);
 
-            if let Some(cell_position) = selected_cell {
+            if let Some(cell_position) = selected_cell { // selected a valid cell (not out of bound)
                 let is_piece_movable =
                     self.selected.is_some() && self.is_movable[Board::to_index1d(cell_position)];
+                let mut new_movable = [false; BOARD_WIDTH * BOARD_HEIGHT];
 
                 if is_piece_movable {
                     self.move_piece(self.selected.unwrap(), cell_position);
-                    self.is_movable = [false; BOARD_WIDTH * BOARD_HEIGHT];
                     self.selected = None;
                 } else {
                     // get new selected piece and its movable cells
-                    self.is_movable = move_calculator::get_moves(cell_position, &self);
+                    move_calculator::get_moves(cell_position, &self, &mut new_movable);
                     self.selected = selected_cell;
                 }
-            } else {
-                self.is_movable = [false; BOARD_WIDTH * BOARD_HEIGHT];
-            };
+
+                self.is_movable = new_movable;
+            }
         }
     }
 
