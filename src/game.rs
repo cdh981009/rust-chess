@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ggez::{event::MouseButton, graphics::Image, *};
+use ggez::{event::MouseButton, graphics::Image, *, glam::Vec2};
 
 use crate::board::*;
 
@@ -27,8 +27,7 @@ impl Assets {
 
 #[derive(Default)]
 pub struct Mouse {
-    x: f32,
-    y: f32,
+    position: Vec2,
     is_mouse_down: HashMap<MouseButton, bool>,
     is_mouse_pressed: HashMap<MouseButton, bool>,
     is_mouse_released: HashMap<MouseButton, bool>,
@@ -45,8 +44,8 @@ impl Mouse {
         }
     }
 
-    pub fn get_mouse(&self) -> (f32, f32) {
-        (self.x, self.y)
+    pub fn get_mouse(&self) -> Vec2 {
+        self.position
     }
 
     pub fn is_mouse_down(&self, mouse_button: MouseButton) -> bool {
@@ -74,8 +73,8 @@ impl GameState {
     pub fn new(ctx: &mut Context) -> GameResult<GameState> {
         let (screen_width, screen_height) = ctx.gfx.drawable_size();
 
-        let board_position = (80.0, 80.0);
-        let board = Board::new(board_position);
+        let board_position = Vec2::new(80.0, 80.0);
+        let board = Board::new(board_position).init();
 
         let assets = Assets::new(ctx);
         let mouse = Default::default();
@@ -147,8 +146,8 @@ impl ggez::event::EventHandler<GameError> for GameState {
         xrel: f32,
         yrel: f32,
     ) -> GameResult {
-        self.mouse.x = x;
-        self.mouse.y = y;
+        self.mouse.position.x = x;
+        self.mouse.position.y = y;
 
         // If you change your screen coordinate system you need to calculate the
         // logical coordinates like this:

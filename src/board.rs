@@ -12,30 +12,64 @@ const BOARD_WIDTH: usize = 8;
 const BOARD_HEIGHT: usize = 8;
 
 pub struct Board {
-    pieces: Vec<Vec<Option<Piece>>>,
+    pieces: [Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
     selected: Option<(usize, usize)>,
     highlight_positions: Vec<(usize, usize)>,
-    x: f32,
-    y: f32,
+    position: Vec2,
     cell_size: f32,
 }
 
 impl Board {
-    pub fn new((x, y): (f32, f32)) -> Self {
-        let config = "rnbqkbnr\
-                            pppppppp\
-                            --------\
-                            --------\
-                            --------\
-                            --------\
-                            PPPPPPPP\
-                            RNBQKBNR";
+    pub fn new(position: Vec2) -> Self {
+        let cell_size = 80.0;
 
-        let mut pieces = vec![vec![None; BOARD_WIDTH]; BOARD_HEIGHT];
+        Board {
+            pieces: [None; BOARD_WIDTH * BOARD_HEIGHT],
+            selected: None,
+            position,
+            cell_size,
+            highlight_positions: vec![],
+        }
+    }
 
-        for row in 0..BOARD_HEIGHT {
-            for col in 0..BOARD_WIDTH {
-                let current = config.as_bytes()[row * BOARD_WIDTH + col] as char;
+    fn to_index1d((x, y): (usize, usize)) -> usize {
+        y * BOARD_WIDTH + x
+    }
+
+    fn to_index2d(ind: usize) -> (usize, usize) {
+        (ind % BOARD_WIDTH, ind / BOARD_WIDTH)
+    }
+
+    fn print(&self) {
+        for y in 0..BOARD_HEIGHT {
+            for x in 0..BOARD_WIDTH {
+                print!(
+                    "{}",
+                    if let Some(piece) = &self.pieces[Board::to_index1d((x, y))] {
+                        piece.to_string()
+                    } else {
+                        '_'.to_string()
+                    }
+                );
+            }
+            println!();
+        }
+    }
+
+    pub fn init(mut self) -> Self {
+        let config: &[u8] = "rnbqkbnr\
+                             pppppppp\
+                             --------\
+                             --------\
+                             --------\
+                             --------\
+                             PPPPPPPP\
+                             RNBQKBNR"
+            .as_bytes();
+
+        for y in 0..BOARD_HEIGHT {
+            for x in 0..BOARD_WIDTH {
+                let current = config[Board::to_index1d((x, y))] as char;
 
                 let piece_type = match current {
                     '-' => continue,
@@ -54,7 +88,7 @@ impl Board {
                     Color::White
                 };
 
-                pieces[row][col] = Some(Piece {
+                self.pieces[Board::to_index1d((x, y))] = Some(Piece {
                     piece_type,
                     color,
                     has_moved: false,
@@ -62,54 +96,29 @@ impl Board {
             }
         }
 
-        // this is for debug
-        for row in &pieces {
-            for elem in row {
-                print!(
-                    "{}",
-                    if let Some(piece) = elem {
-                        piece.to_string()
-                    } else {
-                        '_'.to_string()
-                    }
-                );
-            }
-            println!("");
-        }
-        // end
+        self.print();
 
-        let selected = None;
-        let cell_size = 80.0;
-
-        Board {
-            pieces,
-            selected,
-            x,
-            y,
-            cell_size,
-            highlight_positions: vec![],
-        }
+        self
     }
 
     fn is_position_in_bound(&self, (x, y): (i32, i32)) -> bool {
-        x >= 0 && x < self.pieces[0].len() as i32 && y >= 0 && y < self.pieces.len() as i32
+        x >= 0 && x < BOARD_WIDTH as i32 && y >= 0 && y < BOARD_HEIGHT as i32
     }
 
-    fn is_empty(&self, (x, y): (usize, usize)) -> bool {
-        self.pieces[y][x].is_none()
+    fn is_empty_on(&self, pos: (usize, usize)) -> bool {
+        self.pieces[Board::to_index1d(pos)].is_none()
     }
 
-    fn is_color(&self, (x, y): (usize, usize), color: Color) -> bool {
-        let Some(piece) = &self.pieces[y][x] else { return false; };
+    fn is_color_on(&self, pos: (usize, usize), color: Color) -> bool {
+        let Some(piece) = &self.pieces[Board::to_index1d(pos)] else { return false; };
         piece.color == color
     }
 
-    fn select_cell(&self, mouse: &Mouse) -> Option<(usize, usize)> {
-        let (mx, my) = mouse.get_mouse();
-        let (mx_rel, my_rel) = ((mx - self.x).floor(), (my - self.y).floor());
+    fn try_select_cell(&self, mouse: &Mouse) -> Option<(usize, usize)> {
+        let m_pos = mouse.get_mouse();
+        let m_cell = ((m_pos - self.position) / self.cell_size).floor();
 
-        let x = (mx_rel / self.cell_size) as i32;
-        let y = (my_rel / self.cell_size) as i32;
+        let (x, y) = (m_cell.x as i32, m_cell.y as i32);
 
         if self.is_position_in_bound((x, y)) {
             return Some((x as usize, y as usize));
@@ -135,7 +144,7 @@ impl Board {
         for move_y in 1..=reach {
             let (nx, ny) = (x as i32, y as i32 + move_y * y_direction);
 
-            if self.is_position_in_bound((nx, ny)) && self.is_empty((nx as usize, ny as usize)) {
+            if self.is_position_in_bound((nx, ny)) && self.is_empty_on((nx as usize, ny as usize)) {
                 moves.push((nx as usize, ny as usize));
             } else {
                 break;
@@ -153,7 +162,7 @@ impl Board {
             let (nx, ny) = (x as i32 + move_x, y as i32 + y_direction);
 
             if self.is_position_in_bound((nx, ny))
-                && self.is_color((nx as usize, ny as usize), enemy_color)
+                && self.is_color_on((nx as usize, ny as usize), enemy_color)
             {
                 moves.push((nx as usize, ny as usize));
             }
@@ -187,8 +196,8 @@ impl Board {
             let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
 
             if self.is_position_in_bound((nx, ny))
-                && (self.is_empty((nx as usize, ny as usize))
-                    || self.is_color((nx as usize, ny as usize), enemy_color))
+                && (self.is_empty_on((nx as usize, ny as usize))
+                    || self.is_color_on((nx as usize, ny as usize), enemy_color))
             {
                 moves.push((nx as usize, ny as usize));
             }
@@ -246,8 +255,8 @@ impl Board {
                 let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
 
                 if self.is_position_in_bound((nx, ny))
-                    && (self.is_empty((nx as usize, ny as usize))
-                        || self.is_color((nx as usize, ny as usize), enemy_color))
+                    && (self.is_empty_on((nx as usize, ny as usize))
+                        || self.is_color_on((nx as usize, ny as usize), enemy_color))
                 {
                     moves.push((nx as usize, ny as usize));
                 }
@@ -272,8 +281,8 @@ impl Board {
                 break;
             }
 
-            let is_empty = self.is_empty((nx as usize, ny as usize));
-            let is_enemy = self.is_color((nx as usize, ny as usize), enemy_color);
+            let is_empty = self.is_empty_on((nx as usize, ny as usize));
+            let is_enemy = self.is_color_on((nx as usize, ny as usize), enemy_color);
 
             if is_empty || is_enemy {
                 moves.push((nx as usize, ny as usize));
@@ -323,38 +332,38 @@ impl Board {
         }
     }
 
-    fn compute_moves_from(&self, (x, y): (usize, usize)) -> Vec<(usize, usize)> {
-        let Some(piece) = &self.pieces[y][x] else { return vec![]; };
+    fn compute_moves_from(&self, pos: (usize, usize)) -> Vec<(usize, usize)> {
+        let Some(piece) = &self.pieces[Board::to_index1d(pos)] else { return vec![]; };
 
         use PieceType::*;
 
         let mut moves = Vec::new();
 
         match piece.piece_type {
-            Pawn => self.compute_pawn_moves(piece, (x, y), &mut moves),
-            Knight => self.compute_knight_moves(piece, (x, y), &mut moves),
-            Bishop => self.compute_bishop_moves(piece, (x, y), &mut moves),
-            Rook => self.compute_rook_moves(piece, (x, y), &mut moves),
-            Queen => self.compute_queen_moves(piece, (x, y), &mut moves),
-            King => self.compute_king_moves(piece, (x, y), &mut moves),
+            Pawn => self.compute_pawn_moves(piece, pos, &mut moves),
+            Knight => self.compute_knight_moves(piece, pos, &mut moves),
+            Bishop => self.compute_bishop_moves(piece, pos, &mut moves),
+            Rook => self.compute_rook_moves(piece, pos, &mut moves),
+            Queen => self.compute_queen_moves(piece, pos, &mut moves),
+            King => self.compute_king_moves(piece, pos, &mut moves),
         }
 
         moves
     }
 
     fn move_piece(&mut self, from: (usize, usize), to: (usize, usize)) {
-        let mut src = self.pieces[from.1][from.0];
+        let mut src = self.pieces[Board::to_index1d(from)];
 
         let Some(src_piece) = &mut src else { panic!("{:?} should contain a piece", from) };
-
         src_piece.has_moved = true;
-        self.pieces[from.1][from.0] = None;
-        self.pieces[to.1][to.0] = src;
+
+        self.pieces[Board::to_index1d(from)] = None;
+        self.pieces[Board::to_index1d(to)] = src;
     }
 
     pub fn update(&mut self, mouse: &Mouse) {
         if mouse.is_mouse_pressed(event::MouseButton::Left) {
-            let selected_cell = self.select_cell(mouse);
+            let selected_cell = self.try_select_cell(mouse);
 
             if let Some((x, y)) = selected_cell {
                 // valid cell is selected
@@ -378,15 +387,13 @@ impl Board {
         canvas: &mut graphics::Canvas,
         assets: &mut Assets,
     ) -> GameResult {
-        let (x, y) = (self.x, self.y);
-
-        self.draw_board(canvas, (x, y), self.cell_size);
-        self.draw_pieces(ctx, canvas, assets, (x, y), self.cell_size);
+        self.draw_board(canvas, self.position, self.cell_size);
+        self.draw_pieces(ctx, canvas, assets, self.position, self.cell_size);
 
         Ok(())
     }
 
-    fn draw_board(&self, canvas: &mut graphics::Canvas, (x, y): (f32, f32), cell_size: f32) {
+    fn draw_board(&self, canvas: &mut graphics::Canvas, pos: Vec2, cell_size: f32) {
         let light_color = graphics::Color::from_rgb_u32(0x9699A1);
         let dark_color = graphics::Color::from_rgb_u32(0x434347);
         let select_color = graphics::Color::from_rgba_u32(0xFF000066);
@@ -401,11 +408,14 @@ impl Board {
                     dark_color
                 };
 
-                let pos = [x + cell_size * cell_x as f32, y + cell_size * cell_y as f32];
-                let param = graphics::DrawParam::default().scale(scale).dest(pos);
+                let cell_pos: Vec2 =
+                    pos + Vec2::new(cell_size * cell_x as f32, cell_size * cell_y as f32);
+                let param = graphics::DrawParam::default().scale(scale).dest(cell_pos);
 
+                // draw checker pattern
                 canvas.draw(&graphics::Quad, param.color(color));
 
+                // draw transparent highlight on selected cell
                 if self
                     .selected
                     .is_some_and(|(sx, sy)| (sx, sy) == (cell_x, cell_y))
@@ -415,12 +425,11 @@ impl Board {
             }
         }
 
+        // draw highlight on current movable cells
         for (cell_x, cell_y) in self.highlight_positions.iter() {
-            let pos = [
-                x + cell_size * *cell_x as f32,
-                y + cell_size * *cell_y as f32,
-            ];
-            let param = graphics::DrawParam::default().scale(scale).dest(pos);
+            let cell_pos: Vec2 =
+                pos + Vec2::new(cell_size * *cell_x as f32, cell_size * *cell_y as f32);
+            let param = graphics::DrawParam::default().scale(scale).dest(cell_pos);
 
             canvas.draw(&graphics::Quad, param.color(select_color));
         }
@@ -431,24 +440,22 @@ impl Board {
         ctx: &mut Context,
         canvas: &mut graphics::Canvas,
         assets: &mut Assets,
-        (x, y): (f32, f32),
+        pos: Vec2,
         cell_size: f32,
     ) {
         let sprite_original_size = 460.0;
 
         for cell_x in 0..BOARD_WIDTH {
             for cell_y in 0..BOARD_HEIGHT {
-                if let Some(piece) = &self.pieces[cell_y][cell_x] {
+                if let Some(piece) = &self.pieces[Board::to_index1d((cell_x, cell_y))] {
                     // set pos to the center of the cell
-                    let pos: Vec2 =
-                        <[f32; 2] as Into<Vec2>>::into([
-                            x + cell_size * cell_x as f32,
-                            y + cell_size * cell_y as f32,
-                        ]) + <[f32; 2] as Into<Vec2>>::into([cell_size / 2.0, cell_size / 2.0]);
+                    let cell_pos: Vec2 =
+                        pos + Vec2::new(cell_size * cell_x as f32, cell_size * cell_y as f32);
+                    let cell_pos_centered = cell_pos + Vec2::new(cell_size / 2.0, cell_size / 2.0);
 
                     let image = piece.get_image(ctx, assets);
                     let drawparams = graphics::DrawParam::new()
-                        .dest(pos)
+                        .dest(cell_pos_centered)
                         .offset([0.5, 0.5]) // offset so that the sprite center and the drawing position align
                         .scale([
                             cell_size / sprite_original_size,
@@ -484,9 +491,9 @@ impl fmt::Display for Piece {
             f,
             "{}",
             if self.color == Color::White {
-                c.to_uppercase().to_string()
+                c.to_uppercase()
             } else {
-                c.to_string()
+                c
             }
         )
     }
