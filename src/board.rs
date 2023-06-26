@@ -7,14 +7,15 @@ use ggez::{
 };
 
 use crate::game::*;
+use crate::move_calculator;
 
-const BOARD_WIDTH: usize = 8;
-const BOARD_HEIGHT: usize = 8;
+pub const BOARD_WIDTH: usize = 8;
+pub const BOARD_HEIGHT: usize = 8;
 
 pub struct Board {
     pieces: [Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
     selected: Option<(usize, usize)>,
-    highlight_positions: Vec<(usize, usize)>,
+    is_movable: [bool; BOARD_WIDTH * BOARD_HEIGHT],
     position: Vec2,
     cell_size: f32,
 }
@@ -28,15 +29,15 @@ impl Board {
             selected: None,
             position,
             cell_size,
-            highlight_positions: vec![],
+            is_movable: [false; BOARD_WIDTH * BOARD_HEIGHT],
         }
     }
 
-    fn to_index1d((x, y): (usize, usize)) -> usize {
+    pub fn to_index1d((x, y): (usize, usize)) -> usize {
         y * BOARD_WIDTH + x
     }
 
-    fn to_index2d(ind: usize) -> (usize, usize) {
+    pub fn to_index2d(ind: usize) -> (usize, usize) {
         (ind % BOARD_WIDTH, ind / BOARD_WIDTH)
     }
 
@@ -101,17 +102,21 @@ impl Board {
         self
     }
 
-    fn is_position_in_bound((x, y): (i32, i32)) -> bool {
+    pub fn is_position_in_bound((x, y): (i32, i32)) -> bool {
         x >= 0 && x < BOARD_WIDTH as i32 && y >= 0 && y < BOARD_HEIGHT as i32
     }
 
-    fn is_empty_on(&self, pos: (usize, usize)) -> bool {
+    pub fn is_empty_on(&self, pos: (usize, usize)) -> bool {
         self.pieces[Board::to_index1d(pos)].is_none()
     }
 
-    fn is_color_on(&self, pos: (usize, usize), color: Color) -> bool {
+    pub fn is_color_on(&self, pos: (usize, usize), color: Color) -> bool {
         let Some(piece) = &self.pieces[Board::to_index1d(pos)] else { return false; };
         piece.color == color
+    }
+
+    pub fn get_piece(&self, pos: (usize, usize)) -> &Option<Piece> {
+        &self.pieces[Board::to_index1d(pos)]
     }
 
     fn try_select_cell(&self, mouse: &Mouse) -> Option<(usize, usize)> {
@@ -125,230 +130,6 @@ impl Board {
         }
 
         None
-    }
-
-    fn compute_pawn_moves(
-        &self,
-        piece: &Piece,
-        (x, y): (usize, usize),
-        moves: &mut Vec<(usize, usize)>,
-    ) {
-        // pawn move rule:
-        // only can move forward. 2 if it's the first time, 1 otherwise.
-        // can attack diagonally.
-
-        let y_direction = if piece.color == Color::White { -1 } else { 1 };
-        let reach = if piece.has_moved { 1 } else { 2 };
-
-        // move
-        for move_y in 1..=reach {
-            let (nx, ny) = (x as i32, y as i32 + move_y * y_direction);
-
-            if Board::is_position_in_bound((nx, ny)) && self.is_empty_on((nx as usize, ny as usize)) {
-                moves.push((nx as usize, ny as usize));
-            } else {
-                break;
-            }
-        }
-
-        // attack
-        let enemy_color = if piece.color == Color::White {
-            Color::Black
-        } else {
-            Color::White
-        };
-
-        for move_x in [-1, 1] {
-            let (nx, ny) = (x as i32 + move_x, y as i32 + y_direction);
-
-            if Board::is_position_in_bound((nx, ny))
-                && self.is_color_on((nx as usize, ny as usize), enemy_color)
-            {
-                moves.push((nx as usize, ny as usize));
-            }
-        }
-    }
-
-    fn compute_knight_moves(
-        &self,
-        piece: &Piece,
-        (x, y): (usize, usize),
-        moves: &mut Vec<(usize, usize)>,
-    ) {
-        static DIRS: [(i32, i32); 8] = [
-            (-2, -1),
-            (-2, 1),
-            (2, -1),
-            (2, 1),
-            (-1, -2),
-            (-1, 2),
-            (1, -2),
-            (1, 2),
-        ];
-
-        let enemy_color = if piece.color == Color::White {
-            Color::Black
-        } else {
-            Color::White
-        };
-
-        for (move_x, move_y) in DIRS {
-            let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
-
-            if Board::is_position_in_bound((nx, ny))
-                && (self.is_empty_on((nx as usize, ny as usize))
-                    || self.is_color_on((nx as usize, ny as usize), enemy_color))
-            {
-                moves.push((nx as usize, ny as usize));
-            }
-        }
-    }
-
-    fn compute_bishop_moves(
-        &self,
-        piece: &Piece,
-        (x, y): (usize, usize),
-        moves: &mut Vec<(usize, usize)>,
-    ) {
-        self.compute_diagonal_moves(piece, (x, y), moves)
-    }
-
-    fn compute_rook_moves(
-        &self,
-        piece: &Piece,
-        (x, y): (usize, usize),
-        moves: &mut Vec<(usize, usize)>,
-    ) {
-        self.compute_orthogonal_moves(piece, (x, y), moves)
-    }
-
-    fn compute_queen_moves(
-        &self,
-        piece: &Piece,
-        (x, y): (usize, usize),
-        moves: &mut Vec<(usize, usize)>,
-    ) {
-        self.compute_diagonal_moves(piece, (x, y), moves);
-        self.compute_orthogonal_moves(piece, (x, y), moves);
-    }
-
-    fn compute_king_moves(
-        &self,
-        piece: &Piece,
-        (x, y): (usize, usize),
-        moves: &mut Vec<(usize, usize)>,
-    ) {
-        // todo: castling
-
-        let enemy_color = if piece.color == Color::White {
-            Color::Black
-        } else {
-            Color::White
-        };
-
-        for move_x in -1..=1 {
-            for move_y in -1..=1 {
-                if (move_x, move_y) == (0, 0) {
-                    continue;
-                }
-
-                let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
-
-                if Board::is_position_in_bound((nx, ny))
-                    && (self.is_empty_on((nx as usize, ny as usize))
-                        || self.is_color_on((nx as usize, ny as usize), enemy_color))
-                {
-                    moves.push((nx as usize, ny as usize));
-                }
-            }
-        }
-    }
-
-    fn compute_moves_in_direction(
-        &self,
-        enemy_color: Color,
-        (x, y): (usize, usize),
-        (x_dir, y_dir): (i32, i32),
-        moves: &mut Vec<(usize, usize)>,
-    ) {
-        let (mut nx, mut ny) = (x as i32, y as i32);
-
-        loop {
-            nx += x_dir;
-            ny += y_dir;
-
-            if !Board::is_position_in_bound((nx, ny)) {
-                break;
-            }
-
-            let is_empty = self.is_empty_on((nx as usize, ny as usize));
-            let is_enemy = self.is_color_on((nx as usize, ny as usize), enemy_color);
-
-            if is_empty || is_enemy {
-                moves.push((nx as usize, ny as usize));
-            }
-
-            if !is_empty {
-                break;
-            }
-        }
-    }
-
-    fn compute_orthogonal_moves(
-        &self,
-        piece: &Piece,
-        (x, y): (usize, usize),
-        moves: &mut Vec<(usize, usize)>,
-    ) {
-        static DIRS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-
-        let enemy_color = if piece.color == Color::White {
-            Color::Black
-        } else {
-            Color::White
-        };
-
-        for (x_dir, y_dir) in DIRS {
-            self.compute_moves_in_direction(enemy_color, (x, y), (x_dir, y_dir), moves);
-        }
-    }
-
-    fn compute_diagonal_moves(
-        &self,
-        piece: &Piece,
-        (x, y): (usize, usize),
-        moves: &mut Vec<(usize, usize)>,
-    ) {
-        let enemy_color = if piece.color == Color::White {
-            Color::Black
-        } else {
-            Color::White
-        };
-
-        for x_dir in [-1, 1] {
-            for y_dir in [-1, 1] {
-                self.compute_moves_in_direction(enemy_color, (x, y), (x_dir, y_dir), moves);
-            }
-        }
-    }
-
-    fn compute_moves_from(&self, pos: (usize, usize)) -> Vec<(usize, usize)> {
-        let Some(piece) = &self.pieces[Board::to_index1d(pos)] else { return vec![]; };
-
-        use PieceType::*;
-
-        let mut moves = Vec::new();
-
-        match piece.piece_type {
-            Pawn => self.compute_pawn_moves(piece, pos, &mut moves),
-            Knight => self.compute_knight_moves(piece, pos, &mut moves),
-            Bishop => self.compute_bishop_moves(piece, pos, &mut moves),
-            Rook => self.compute_rook_moves(piece, pos, &mut moves),
-            Queen => self.compute_queen_moves(piece, pos, &mut moves),
-            King => self.compute_king_moves(piece, pos, &mut moves),
-        }
-
-        moves
     }
 
     fn move_piece(&mut self, from: (usize, usize), to: (usize, usize)) {
@@ -365,18 +146,21 @@ impl Board {
         if mouse.is_mouse_pressed(event::MouseButton::Left) {
             let selected_cell = self.try_select_cell(mouse);
 
-            if let Some((x, y)) = selected_cell {
-                // valid cell is selected
-                if self.selected.is_some() && self.highlight_positions.contains(&(x, y)) {
-                    self.move_piece(self.selected.unwrap(), (x, y));
-                    self.highlight_positions = Vec::new();
+            if let Some(cell_position) = selected_cell {
+                let is_piece_movable =
+                    self.selected.is_some() && self.is_movable[Board::to_index1d(cell_position)];
+
+                if is_piece_movable {
+                    self.move_piece(self.selected.unwrap(), cell_position);
+                    self.is_movable = [false; BOARD_WIDTH * BOARD_HEIGHT];
                     self.selected = None;
                 } else {
-                    self.highlight_positions = self.compute_moves_from((x, y));
+                    // get new selected piece and its movable cells
+                    self.is_movable = move_calculator::get_moves(cell_position, &self);
                     self.selected = selected_cell;
                 }
             } else {
-                self.highlight_positions = Vec::new();
+                self.is_movable = [false; BOARD_WIDTH * BOARD_HEIGHT];
             };
         }
     }
@@ -415,23 +199,15 @@ impl Board {
                 // draw checker pattern
                 canvas.draw(&graphics::Quad, param.color(color));
 
-                // draw transparent highlight on selected cell
+                // draw transparent highlight on selected cell and its movable cell
                 if self
                     .selected
                     .is_some_and(|(sx, sy)| (sx, sy) == (cell_x, cell_y))
+                    || self.is_movable[Board::to_index1d((cell_x, cell_y))]
                 {
                     canvas.draw(&graphics::Quad, param.color(select_color));
                 }
             }
-        }
-
-        // draw highlight on current movable cells
-        for (cell_x, cell_y) in self.highlight_positions.iter() {
-            let cell_pos: Vec2 =
-                pos + Vec2::new(cell_size * *cell_x as f32, cell_size * *cell_y as f32);
-            let param = graphics::DrawParam::default().scale(scale).dest(cell_pos);
-
-            canvas.draw(&graphics::Quad, param.color(select_color));
         }
     }
 
@@ -469,7 +245,7 @@ impl Board {
 }
 
 #[derive(Copy, Clone)]
-struct Piece {
+pub struct Piece {
     piece_type: PieceType,
     color: Color,
     has_moved: bool,
@@ -480,6 +256,18 @@ impl Piece {
         let sprite = self.color.to_string() + &self.piece_type.to_string();
 
         assets.try_get_image(ctx, &sprite).unwrap()
+    }
+
+    pub fn get_piece_type(&self) -> PieceType {
+        self.piece_type
+    }
+
+    pub fn get_color(&self) -> Color {
+        self.color
+    }
+
+    pub fn has_moved(&self) -> bool {
+        self.has_moved
     }
 }
 
@@ -500,7 +288,7 @@ impl fmt::Display for Piece {
 }
 
 #[derive(Copy, Clone)]
-enum PieceType {
+pub enum PieceType {
     Pawn,
     Rook,
     Bishop,
@@ -527,7 +315,7 @@ impl fmt::Display for PieceType {
 }
 
 #[derive(Copy, Clone, PartialEq)]
-enum Color {
+pub enum Color {
     White,
     Black,
 }

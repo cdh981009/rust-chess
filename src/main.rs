@@ -2,6 +2,7 @@ use std::{env, path};
 
 mod board;
 mod game;
+mod move_calculator;
 
 use game::GameState;
 use ggez::*;
