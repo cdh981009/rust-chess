@@ -170,38 +170,89 @@ impl Board {
     }
 
     // compute and populate each piece's legal moves
-    fn compute_each_moves(&mut self) {
+    fn compute_each_legal_moves(&mut self) {
         // reset previous legal moves
         self.legal_moves = [[false; BOARD_SIZE_1D]; BOARD_SIZE_1D];
 
         // iterate each piece of current turn and compute its legal moves
-        for pos in 0..BOARD_SIZE_1D {
-            let pos_2d = Board::to_index2d(pos);
+        for pos_1d in 0..BOARD_SIZE_1D {
+            let pos_2d = Board::to_index2d(pos_1d);
 
             if !Board::is_color_on(&self.board_state, pos_2d, self.current_turn_color) {
                 continue;
             }
 
-            move_calculator::get_moves_of(&self.board_state, pos_2d, &mut self.legal_moves[pos]);
+            move_calculator::get_moves(&self.board_state, pos_2d, &mut self.legal_moves[pos_1d]);
 
-            // TODO: simulate every possible move and see if it causes check (put the king in danger)
+            self.eliminate_illegal_moves(pos_1d);
         }
     }
 
-    fn change_turn(&mut self) {
-        self.current_turn_color = if self.current_turn_color == PieceColor::White {
-            PieceColor::Black
-        } else {
-            PieceColor::White
-        };
+    fn eliminate_illegal_moves(&mut self, src_pos_1d: usize) {
+        let mut moves = self.legal_moves[src_pos_1d];
 
+        for dst_pos_1d in 0..BOARD_SIZE_1D {
+            if !moves[dst_pos_1d] {
+                continue;
+            }
+
+            let from = Board::to_index2d(src_pos_1d);
+            let to = Board::to_index2d(dst_pos_1d);
+
+            // temporarily move the piece to the destination
+            let original_src = self.board_state[src_pos_1d];
+            let original_dst = self.move_piece(from, to);
+
+            if self.is_in_check(self.current_turn_color) {
+                moves[dst_pos_1d] = false;
+            }
+
+            // recover the original state
+            self.board_state[src_pos_1d] = original_src;
+            self.board_state[dst_pos_1d] = original_dst;
+        }
+
+        self.legal_moves[src_pos_1d] = moves;
+    }
+
+    fn is_in_check(&self, color: PieceColor) -> bool {
+        let mut kings_position: Option<usize> = None;
+
+        // find king of the given color
+        for pos_1d in 0..BOARD_SIZE_1D {
+            if self.board_state[pos_1d]
+                .is_some_and(|piece| piece.color == color && piece.piece_type == PieceType::King)
+            {
+                kings_position = Some(pos_1d);
+                break;
+            }
+        }
+
+        let kings_position = kings_position.expect("king not found in the board");
+        let enemy_color = color.get_enemy_color();
+
+        // get all psuedo-legal moves of the enemy (moves that doesn't consider check)
+        let mut enemy_moves = [false; BOARD_SIZE_1D];
+
+        for pos_1d in 0..BOARD_SIZE_1D {
+            let Some(piece) = self.board_state[pos_1d] else { continue };
+            if piece.color != enemy_color { continue };
+
+            move_calculator::get_moves(&self.board_state, Board::to_index2d(pos_1d), &mut enemy_moves);
+        }
+
+        enemy_moves[kings_position]
+    }
+
+    fn change_turn(&mut self) {
+        self.current_turn_color = self.current_turn_color.get_enemy_color();
         self.turn_state = TurnState::ComputeMoves;
         self.selected_cell = None;
     }
 
     pub fn update(&mut self, mouse: &Mouse) {
         if self.turn_state == TurnState::ComputeMoves {
-            self.compute_each_moves();
+            self.compute_each_legal_moves();
 
             // if no legal moves for all pieces
             //      if inCheck
@@ -382,7 +433,7 @@ impl fmt::Display for Piece {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum PieceType {
     Pawn,
     Rook,
@@ -413,6 +464,15 @@ impl fmt::Display for PieceType {
 pub enum PieceColor {
     White,
     Black,
+}
+
+impl PieceColor {
+    pub fn get_enemy_color(&self) -> PieceColor {
+        match *self {
+            PieceColor::White => PieceColor::Black,
+            PieceColor::Black => PieceColor::White,
+        }
+    }
 }
 
 impl fmt::Display for PieceColor {

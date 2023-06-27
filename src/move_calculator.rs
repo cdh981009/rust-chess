@@ -1,6 +1,6 @@
 use crate::board::*;
 
-pub fn get_moves_of(
+pub fn get_moves(
     board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
     pos: (usize, usize),
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
@@ -49,11 +49,7 @@ fn get_pawn_moves(
     }
 
     // attack
-    let enemy_color = if piece.get_color() == PieceColor::White {
-        PieceColor::Black
-    } else {
-        PieceColor::White
-    };
+    let enemy_color = piece.get_color().get_enemy_color();
 
     for move_x in [-1, 1] {
         let (nx, ny) = (x as i32 + move_x, y as i32 + y_direction);
@@ -83,11 +79,7 @@ fn get_knight_moves(
         (1, 2),
     ];
 
-    let enemy_color = if piece.get_color() == PieceColor::White {
-        PieceColor::Black
-    } else {
-        PieceColor::White
-    };
+    let enemy_color = piece.get_color().get_enemy_color();
 
     for (move_x, move_y) in DIRS {
         let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
@@ -107,11 +99,7 @@ fn get_bishop_moves(
     (x, y): (usize, usize),
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
 ) {
-    let enemy_color = if piece.get_color() == PieceColor::White {
-        PieceColor::Black
-    } else {
-        PieceColor::White
-    };
+    let enemy_color = piece.get_color().get_enemy_color();
 
     get_diagonal_moves(board_state, (x, y), enemy_color, moves)
 }
@@ -122,11 +110,7 @@ fn get_rook_moves(
     (x, y): (usize, usize),
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
 ) {
-    let enemy_color = if piece.get_color() == PieceColor::White {
-        PieceColor::Black
-    } else {
-        PieceColor::White
-    };
+    let enemy_color = piece.get_color().get_enemy_color();
 
     get_orthogonal_moves(board_state, (x, y), enemy_color, moves)
 }
@@ -137,11 +121,7 @@ fn get_queen_moves(
     (x, y): (usize, usize),
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
 ) {
-    let enemy_color = if piece.get_color() == PieceColor::White {
-        PieceColor::Black
-    } else {
-        PieceColor::White
-    };
+    let enemy_color = piece.get_color().get_enemy_color();
 
     get_diagonal_moves(board_state, (x, y), enemy_color, moves);
     get_orthogonal_moves(board_state, (x, y), enemy_color, moves);
@@ -155,11 +135,7 @@ fn get_king_moves(
 ) {
     // todo: castling
 
-    let enemy_color = if piece.get_color() == PieceColor::White {
-        PieceColor::Black
-    } else {
-        PieceColor::White
-    };
+    let enemy_color = piece.get_color().get_enemy_color();
 
     for move_x in -1..=1 {
         for move_y in -1..=1 {
