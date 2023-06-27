@@ -152,14 +152,21 @@ impl Board {
         None
     }
 
-    fn move_piece(&mut self, from: (usize, usize), to: (usize, usize)) {
-        let mut src = self.board_state[Board::to_index1d(from)];
+    // move piece and return the piece previously on the destination
+    fn move_piece(&mut self, from: (usize, usize), to: (usize, usize)) -> Option<Piece> {
+        let from_1d = Board::to_index1d(from);
+        let to_1d = Board::to_index1d(to);
+
+        let mut src = self.board_state[from_1d];
+        let dst = self.board_state[to_1d];
 
         let Some(src_piece) = &mut src else { panic!("{:?} should contain a piece", from) };
         src_piece.has_moved = true;
 
-        self.board_state[Board::to_index1d(from)] = None;
-        self.board_state[Board::to_index1d(to)] = src;
+        self.board_state[from_1d] = None;
+        self.board_state[to_1d] = src;
+
+        dst
     }
 
     // compute and populate each piece's legal moves
