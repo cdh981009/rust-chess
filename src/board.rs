@@ -13,7 +13,7 @@ pub const BOARD_WIDTH: usize = 8;
 pub const BOARD_HEIGHT: usize = 8;
 
 pub struct Board {
-    pieces: [Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: [Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
     selected: Option<(usize, usize)>,
     is_movable: [bool; BOARD_WIDTH * BOARD_HEIGHT],
     position: Vec2,
@@ -26,7 +26,7 @@ impl Board {
         let cell_size = 80.0;
 
         Board {
-            pieces: [None; BOARD_WIDTH * BOARD_HEIGHT],
+            board_state: [None; BOARD_WIDTH * BOARD_HEIGHT],
             selected: None,
             is_movable: [false; BOARD_WIDTH * BOARD_HEIGHT],
             position,
@@ -48,7 +48,7 @@ impl Board {
             for x in 0..BOARD_WIDTH {
                 print!(
                     "{}",
-                    if let Some(piece) = &self.pieces[Board::to_index1d((x, y))] {
+                    if let Some(piece) = &self.board_state[Board::to_index1d((x, y))] {
                         piece.to_string()
                     } else {
                         '_'.to_string()
@@ -91,7 +91,7 @@ impl Board {
                     Color::White
                 };
 
-                self.pieces[Board::to_index1d((x, y))] = Some(Piece {
+                self.board_state[Board::to_index1d((x, y))] = Some(Piece {
                     piece_type,
                     color,
                     has_moved: false,
@@ -108,17 +108,17 @@ impl Board {
         x >= 0 && x < BOARD_WIDTH as i32 && y >= 0 && y < BOARD_HEIGHT as i32
     }
 
-    pub fn is_empty_on(&self, pos: (usize, usize)) -> bool {
-        self.pieces[Board::to_index1d(pos)].is_none()
+    pub fn is_empty_on(board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT], pos: (usize, usize)) -> bool {
+        board_state[Board::to_index1d(pos)].is_none()
     }
 
-    pub fn is_color_on(&self, pos: (usize, usize), color: Color) -> bool {
-        let Some(piece) = &self.pieces[Board::to_index1d(pos)] else { return false; };
+    pub fn is_color_on(board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT], pos: (usize, usize), color: Color) -> bool {
+        let Some(piece) = board_state[Board::to_index1d(pos)] else { return false; };
         piece.color == color
     }
 
     pub fn get_piece(&self, pos: (usize, usize)) -> &Option<Piece> {
-        &self.pieces[Board::to_index1d(pos)]
+        &self.board_state[Board::to_index1d(pos)]
     }
 
     fn try_select_cell(&self, mouse: &Mouse) -> Option<(usize, usize)> {
@@ -135,13 +135,13 @@ impl Board {
     }
 
     fn move_piece(&mut self, from: (usize, usize), to: (usize, usize)) {
-        let mut src = self.pieces[Board::to_index1d(from)];
+        let mut src = self.board_state[Board::to_index1d(from)];
 
         let Some(src_piece) = &mut src else { panic!("{:?} should contain a piece", from) };
         src_piece.has_moved = true;
 
-        self.pieces[Board::to_index1d(from)] = None;
-        self.pieces[Board::to_index1d(to)] = src;
+        self.board_state[Board::to_index1d(from)] = None;
+        self.board_state[Board::to_index1d(to)] = src;
     }
 
     pub fn update(&mut self, mouse: &Mouse) {
@@ -164,8 +164,8 @@ impl Board {
                     self.selected = None;
                 } else {
                     // get new selected piece and its movable cells
-                    if self.is_color_on(cell_position, self.current_turn) {
-                        move_calculator::get_moves(cell_position, &self, &mut new_movable);
+                    if Board::is_color_on(&self.board_state, cell_position, self.current_turn) {
+                        move_calculator::get_moves(&self.board_state, cell_position, &mut new_movable);
                     }
                     self.selected = selected_cell;
                 }
@@ -255,7 +255,7 @@ impl Board {
 
         for cell_x in 0..BOARD_WIDTH {
             for cell_y in 0..BOARD_HEIGHT {
-                if let Some(piece) = &self.pieces[Board::to_index1d((cell_x, cell_y))] {
+                if let Some(piece) = &self.board_state[Board::to_index1d((cell_x, cell_y))] {
                     // set pos to the center of the cell
                     let cell_pos: Vec2 =
                         pos + Vec2::new(cell_size * cell_x as f32, cell_size * cell_y as f32);
