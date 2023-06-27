@@ -225,7 +225,7 @@ impl Board {
                 };
 
                 let cell_pos: Vec2 =
-                    pos + Vec2::new(cell_size * cell_x as f32, cell_size * cell_y as f32);
+                    pos + vec2(cell_size * cell_x as f32, cell_size * cell_y as f32);
                 let param = graphics::DrawParam::default().scale(scale).dest(cell_pos);
 
                 // draw checker pattern
@@ -257,9 +257,9 @@ impl Board {
             for cell_y in 0..BOARD_HEIGHT {
                 if let Some(piece) = &self.board_state[Board::to_index1d((cell_x, cell_y))] {
                     // set pos to the center of the cell
-                    let cell_pos: Vec2 =
-                        pos + Vec2::new(cell_size * cell_x as f32, cell_size * cell_y as f32);
-                    let cell_pos_centered = cell_pos + Vec2::new(cell_size / 2.0, cell_size / 2.0);
+                    let cell_pos =
+                        pos + vec2(cell_size * cell_x as f32, cell_size * cell_y as f32);
+                    let cell_pos_centered = cell_pos + vec2(cell_size / 2.0, cell_size / 2.0);
 
                     let image = piece.get_image(ctx, assets);
                     let drawparams = graphics::DrawParam::new()
