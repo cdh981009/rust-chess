@@ -1,7 +1,7 @@
 use std::{fmt, mem::swap};
 
 use ggez::{
-    glam::Vec2,
+    glam::{Vec2, vec2},
     graphics::{self, Image},
     *,
 };
@@ -18,6 +18,7 @@ pub struct Board {
     is_movable: [bool; BOARD_WIDTH * BOARD_HEIGHT],
     position: Vec2,
     cell_size: f32,
+    current_turn: Color,
 }
 
 impl Board {
@@ -27,9 +28,10 @@ impl Board {
         Board {
             pieces: [None; BOARD_WIDTH * BOARD_HEIGHT],
             selected: None,
+            is_movable: [false; BOARD_WIDTH * BOARD_HEIGHT],
             position,
             cell_size,
-            is_movable: [false; BOARD_WIDTH * BOARD_HEIGHT],
+            current_turn: Color::White,
         }
     }
 
@@ -146,17 +148,25 @@ impl Board {
         if mouse.is_mouse_pressed(event::MouseButton::Left) {
             let selected_cell = self.try_select_cell(mouse);
 
-            if let Some(cell_position) = selected_cell { // selected a valid cell (not out of bound)
+            if let Some(cell_position) = selected_cell {
+                // selected a valid cell (not out of bound)
                 let is_piece_movable =
                     self.selected.is_some() && self.is_movable[Board::to_index1d(cell_position)];
                 let mut new_movable = [false; BOARD_WIDTH * BOARD_HEIGHT];
 
                 if is_piece_movable {
                     self.move_piece(self.selected.unwrap(), cell_position);
+                    self.current_turn = if self.current_turn == Color::White {
+                        Color::Black
+                    } else {
+                        Color::White
+                    };
                     self.selected = None;
                 } else {
                     // get new selected piece and its movable cells
-                    move_calculator::get_moves(cell_position, &self, &mut new_movable);
+                    if self.is_color_on(cell_position, self.current_turn) {
+                        move_calculator::get_moves(cell_position, &self, &mut new_movable);
+                    }
                     self.selected = selected_cell;
                 }
 
@@ -171,10 +181,32 @@ impl Board {
         canvas: &mut graphics::Canvas,
         assets: &mut Assets,
     ) -> GameResult {
+        
+        self.draw_turn(canvas);
         self.draw_board(canvas, self.position, self.cell_size);
         self.draw_pieces(ctx, canvas, assets, self.position, self.cell_size);
 
         Ok(())
+    }
+
+    fn draw_turn(&self, canvas: &mut graphics::Canvas) {
+        let turn_text = graphics::Text::new(format!(
+            "{}'s turn",
+            if self.current_turn == Color::White {
+                "White"
+            } else {
+                "Black"
+            }
+        ))
+        //.set_font("LiberationMono")
+        .set_scale(32.)
+        .clone();
+
+        canvas.draw(
+            &turn_text,
+            graphics::DrawParam::from(vec2(15., 15.))
+                .color(graphics::Color::from((0, 0, 0, 255))),
+        );
     }
 
     fn draw_board(&self, canvas: &mut graphics::Canvas, pos: Vec2, cell_size: f32) {
