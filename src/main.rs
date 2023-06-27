@@ -4,7 +4,7 @@ mod board;
 mod game;
 mod move_calculator;
 
-use game::GameState;
+use game::MainState;
 use ggez::*;
 
 const WINDOW_WIDTH: f32 = 800.0;
@@ -29,7 +29,7 @@ fn main() -> GameResult {
         .build()
         .unwrap();
 
-    let state = GameState::new(&mut ctx)?;
+    let state = MainState::new(&mut ctx)?;
 
     event::run(ctx, event_loop, state);
 }

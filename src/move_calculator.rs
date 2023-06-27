@@ -1,6 +1,6 @@
 use crate::board::*;
 
-pub fn get_moves(
+pub fn get_moves_of(
     board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
     pos: (usize, usize),
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
@@ -28,7 +28,7 @@ fn get_pawn_moves(
     // only can move forward. 2 if it's the first time, 1 otherwise.
     // must attack diagonally.
 
-    let y_direction = if piece.get_color() == Color::White {
+    let y_direction = if piece.get_color() == PieceColor::White {
         -1
     } else {
         1
@@ -49,10 +49,10 @@ fn get_pawn_moves(
     }
 
     // attack
-    let enemy_color = if piece.get_color() == Color::White {
-        Color::Black
+    let enemy_color = if piece.get_color() == PieceColor::White {
+        PieceColor::Black
     } else {
-        Color::White
+        PieceColor::White
     };
 
     for move_x in [-1, 1] {
@@ -83,10 +83,10 @@ fn get_knight_moves(
         (1, 2),
     ];
 
-    let enemy_color = if piece.get_color() == Color::White {
-        Color::Black
+    let enemy_color = if piece.get_color() == PieceColor::White {
+        PieceColor::Black
     } else {
-        Color::White
+        PieceColor::White
     };
 
     for (move_x, move_y) in DIRS {
@@ -107,10 +107,10 @@ fn get_bishop_moves(
     (x, y): (usize, usize),
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
 ) {
-    let enemy_color = if piece.get_color() == Color::White {
-        Color::Black
+    let enemy_color = if piece.get_color() == PieceColor::White {
+        PieceColor::Black
     } else {
-        Color::White
+        PieceColor::White
     };
 
     get_diagonal_moves(board_state, (x, y), enemy_color, moves)
@@ -122,10 +122,10 @@ fn get_rook_moves(
     (x, y): (usize, usize),
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
 ) {
-    let enemy_color = if piece.get_color() == Color::White {
-        Color::Black
+    let enemy_color = if piece.get_color() == PieceColor::White {
+        PieceColor::Black
     } else {
-        Color::White
+        PieceColor::White
     };
 
     get_orthogonal_moves(board_state, (x, y), enemy_color, moves)
@@ -137,10 +137,10 @@ fn get_queen_moves(
     (x, y): (usize, usize),
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
 ) {
-    let enemy_color = if piece.get_color() == Color::White {
-        Color::Black
+    let enemy_color = if piece.get_color() == PieceColor::White {
+        PieceColor::Black
     } else {
-        Color::White
+        PieceColor::White
     };
 
     get_diagonal_moves(board_state, (x, y), enemy_color, moves);
@@ -155,10 +155,10 @@ fn get_king_moves(
 ) {
     // todo: castling
 
-    let enemy_color = if piece.get_color() == Color::White {
-        Color::Black
+    let enemy_color = if piece.get_color() == PieceColor::White {
+        PieceColor::Black
     } else {
-        Color::White
+        PieceColor::White
     };
 
     for move_x in -1..=1 {
@@ -183,7 +183,7 @@ fn get_moves_in_direction(
     board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
     (x, y): (usize, usize),
     (x_dir, y_dir): (i32, i32),
-    enemy_color: Color,
+    enemy_color: PieceColor,
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
 ) {
     let (mut nx, mut ny) = (x as i32, y as i32);
@@ -212,7 +212,7 @@ fn get_moves_in_direction(
 fn get_orthogonal_moves(
     board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
     (x, y): (usize, usize),
-    enemy_color: Color,
+    enemy_color: PieceColor,
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
 ) {
     static DIRS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
@@ -225,7 +225,7 @@ fn get_orthogonal_moves(
 fn get_diagonal_moves(
     board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
     (x, y): (usize, usize),
-    enemy_color: Color,
+    enemy_color: PieceColor,
     moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
 ) {
     for x_dir in [-1, 1] {

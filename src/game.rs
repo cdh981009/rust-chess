@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ggez::{event::MouseButton, graphics::Image, *, glam::Vec2};
+use ggez::{event::MouseButton, glam::Vec2, graphics::Image, *};
 
 use crate::board::*;
 
@@ -61,7 +61,7 @@ impl Mouse {
     }
 }
 
-pub struct GameState {
+pub struct MainState {
     screen_width: f32,
     screen_height: f32,
     board: Board,
@@ -69,8 +69,8 @@ pub struct GameState {
     mouse: Mouse,
 }
 
-impl GameState {
-    pub fn new(ctx: &mut Context) -> GameResult<GameState> {
+impl MainState {
+    pub fn new(ctx: &mut Context) -> GameResult<MainState> {
         let (screen_width, screen_height) = ctx.gfx.drawable_size();
 
         let board_position = Vec2::new(80.0, 80.0);
@@ -79,7 +79,7 @@ impl GameState {
         let assets = Assets::new(ctx);
         let mouse = Default::default();
 
-        Ok(GameState {
+        Ok(MainState {
             screen_width,
             screen_height,
             board,
@@ -89,7 +89,7 @@ impl GameState {
     }
 }
 
-impl ggez::event::EventHandler<GameError> for GameState {
+impl ggez::event::EventHandler<GameError> for MainState {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         // update things here:
         self.board.update(&self.mouse);
@@ -103,8 +103,7 @@ impl ggez::event::EventHandler<GameError> for GameState {
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         let mut canvas = graphics::Canvas::from_frame(ctx, graphics::Color::WHITE);
 
-        self.board
-            .draw(ctx, &mut canvas, &mut self.assets)?;
+        self.board.draw(ctx, &mut canvas, &mut self.assets)?;
 
         canvas.finish(ctx)?;
 

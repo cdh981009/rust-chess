@@ -1,7 +1,7 @@
 use std::{fmt, mem::swap};
 
 use ggez::{
-    glam::{Vec2, vec2},
+    glam::{vec2, Vec2},
     graphics::{self, Image},
     *,
 };
@@ -11,14 +11,26 @@ use crate::move_calculator;
 
 pub const BOARD_WIDTH: usize = 8;
 pub const BOARD_HEIGHT: usize = 8;
+pub const BOARD_SIZE_1D: usize = BOARD_WIDTH * BOARD_HEIGHT;
+
+#[derive(PartialEq)]
+enum TurnState {
+    ComputeMoves,
+    Normal,
+    Check,
+}
 
 pub struct Board {
-    board_state: [Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
-    selected: Option<(usize, usize)>,
-    is_movable: [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    // fields for game logic
+    board_state: [Option<Piece>; BOARD_SIZE_1D],
+    selected_cell: Option<(usize, usize)>,
+    legal_moves: [[bool; BOARD_SIZE_1D]; BOARD_SIZE_1D],
+    current_turn_color: PieceColor,
+    turn_state: TurnState,
+
+    // fields for drawing
     position: Vec2,
     cell_size: f32,
-    current_turn: Color,
 }
 
 impl Board {
@@ -26,12 +38,14 @@ impl Board {
         let cell_size = 80.0;
 
         Board {
-            board_state: [None; BOARD_WIDTH * BOARD_HEIGHT],
-            selected: None,
-            is_movable: [false; BOARD_WIDTH * BOARD_HEIGHT],
+            board_state: [None; BOARD_SIZE_1D],
+            selected_cell: None,
+            legal_moves: [[false; BOARD_SIZE_1D]; BOARD_SIZE_1D],
+            current_turn_color: PieceColor::White,
+            turn_state: TurnState::ComputeMoves,
+
             position,
             cell_size,
-            current_turn: Color::White,
         }
     }
 
@@ -86,9 +100,9 @@ impl Board {
                 };
 
                 let color = if current.is_lowercase() {
-                    Color::Black
+                    PieceColor::Black
                 } else {
-                    Color::White
+                    PieceColor::White
                 };
 
                 self.board_state[Board::to_index1d((x, y))] = Some(Piece {
@@ -108,11 +122,15 @@ impl Board {
         x >= 0 && x < BOARD_WIDTH as i32 && y >= 0 && y < BOARD_HEIGHT as i32
     }
 
-    pub fn is_empty_on(board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT], pos: (usize, usize)) -> bool {
+    pub fn is_empty_on(board_state: &[Option<Piece>; BOARD_SIZE_1D], pos: (usize, usize)) -> bool {
         board_state[Board::to_index1d(pos)].is_none()
     }
 
-    pub fn is_color_on(board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT], pos: (usize, usize), color: Color) -> bool {
+    pub fn is_color_on(
+        board_state: &[Option<Piece>; BOARD_SIZE_1D],
+        pos: (usize, usize),
+        color: PieceColor,
+    ) -> bool {
         let Some(piece) = board_state[Board::to_index1d(pos)] else { return false; };
         piece.color == color
     }
@@ -144,33 +162,69 @@ impl Board {
         self.board_state[Board::to_index1d(to)] = src;
     }
 
+    // compute and populate each piece's legal moves
+    fn compute_each_moves(&mut self) {
+        // reset previous legal moves
+        self.legal_moves = [[false; BOARD_SIZE_1D]; BOARD_SIZE_1D];
+
+        // iterate each piece of current turn and compute its legal moves
+        for pos in 0..BOARD_SIZE_1D {
+            let pos_2d = Board::to_index2d(pos);
+
+            if !Board::is_color_on(&self.board_state, pos_2d, self.current_turn_color) {
+                continue;
+            }
+
+            move_calculator::get_moves_of(&self.board_state, pos_2d, &mut self.legal_moves[pos]);
+
+            // TODO: simulate every possible move and see if it causes check (put the king in danger)
+        }
+    }
+
+    fn change_turn(&mut self) {
+        self.current_turn_color = if self.current_turn_color == PieceColor::White {
+            PieceColor::Black
+        } else {
+            PieceColor::White
+        };
+
+        self.turn_state = TurnState::ComputeMoves;
+        self.selected_cell = None;
+    }
+
     pub fn update(&mut self, mouse: &Mouse) {
+        if self.turn_state == TurnState::ComputeMoves {
+            self.compute_each_moves();
+
+            // if no legal moves for all pieces
+            //      if inCheck
+            //          then checkmate -> current color loses
+            //      else
+            //          then stalemate -> draw
+            // else if there exists some legal move
+            //      self.turn_state = TurnState::Normal
+
+            self.turn_state = TurnState::Normal;
+        }
+
         if mouse.is_mouse_pressed(event::MouseButton::Left) {
-            let selected_cell = self.try_select_cell(mouse);
+            let cell = self.try_select_cell(mouse);
 
-            if let Some(cell_position) = selected_cell {
-                // selected a valid cell (not out of bound)
-                let is_piece_movable =
-                    self.selected.is_some() && self.is_movable[Board::to_index1d(cell_position)];
-                let mut new_movable = [false; BOARD_WIDTH * BOARD_HEIGHT];
+            if let Some(cell_position) = cell {
+                let is_movable = self.selected_cell.is_some_and(|selected_piece| {
+                    self.legal_moves[Board::to_index1d(selected_piece)]
+                        [Board::to_index1d(cell_position)]
+                });
 
-                if is_piece_movable {
-                    self.move_piece(self.selected.unwrap(), cell_position);
-                    self.current_turn = if self.current_turn == Color::White {
-                        Color::Black
-                    } else {
-                        Color::White
-                    };
-                    self.selected = None;
+                if is_movable {
+                    // when there's a selected piece and newly-selected cell is one of it's possible moves
+                    // move the piece and change the turn
+                    self.move_piece(self.selected_cell.unwrap(), cell_position);
+                    self.change_turn();
                 } else {
-                    // get new selected piece and its movable cells
-                    if Board::is_color_on(&self.board_state, cell_position, self.current_turn) {
-                        move_calculator::get_moves(&self.board_state, cell_position, &mut new_movable);
-                    }
-                    self.selected = selected_cell;
+                    // select new piece on this cell
+                    self.selected_cell = cell;
                 }
-
-                self.is_movable = new_movable;
             }
         }
     }
@@ -181,7 +235,6 @@ impl Board {
         canvas: &mut graphics::Canvas,
         assets: &mut Assets,
     ) -> GameResult {
-        
         self.draw_turn(canvas);
         self.draw_board(canvas, self.position, self.cell_size);
         self.draw_pieces(ctx, canvas, assets, self.position, self.cell_size);
@@ -192,7 +245,7 @@ impl Board {
     fn draw_turn(&self, canvas: &mut graphics::Canvas) {
         let turn_text = graphics::Text::new(format!(
             "{}'s turn",
-            if self.current_turn == Color::White {
+            if self.current_turn_color == PieceColor::White {
                 "White"
             } else {
                 "Black"
@@ -204,8 +257,7 @@ impl Board {
 
         canvas.draw(
             &turn_text,
-            graphics::DrawParam::from(vec2(15., 15.))
-                .color(graphics::Color::from((0, 0, 0, 255))),
+            graphics::DrawParam::from(vec2(15., 15.)).color(graphics::Color::from((0, 0, 0, 255))),
         );
     }
 
@@ -231,12 +283,17 @@ impl Board {
                 // draw checker pattern
                 canvas.draw(&graphics::Quad, param.color(color));
 
-                // draw transparent highlight on selected cell and its movable cell
-                if self
-                    .selected
-                    .is_some_and(|(sx, sy)| (sx, sy) == (cell_x, cell_y))
-                    || self.is_movable[Board::to_index1d((cell_x, cell_y))]
-                {
+                // draw transparent highlight on the selected cell and its movable cells
+                let is_selected_cell = self
+                    .selected_cell
+                    .is_some_and(|(sx, sy)| (sx, sy) == (cell_x, cell_y));
+
+                let is_movable_cell = self.selected_cell.is_some_and(|selected| {
+                    self.legal_moves[Board::to_index1d(selected)]
+                        [Board::to_index1d((cell_x, cell_y))]
+                });
+
+                if is_selected_cell || is_movable_cell {
                     canvas.draw(&graphics::Quad, param.color(select_color));
                 }
             }
@@ -257,8 +314,7 @@ impl Board {
             for cell_y in 0..BOARD_HEIGHT {
                 if let Some(piece) = &self.board_state[Board::to_index1d((cell_x, cell_y))] {
                     // set pos to the center of the cell
-                    let cell_pos =
-                        pos + vec2(cell_size * cell_x as f32, cell_size * cell_y as f32);
+                    let cell_pos = pos + vec2(cell_size * cell_x as f32, cell_size * cell_y as f32);
                     let cell_pos_centered = cell_pos + vec2(cell_size / 2.0, cell_size / 2.0);
 
                     let image = piece.get_image(ctx, assets);
@@ -279,7 +335,7 @@ impl Board {
 #[derive(Copy, Clone)]
 pub struct Piece {
     piece_type: PieceType,
-    color: Color,
+    color: PieceColor,
     has_moved: bool,
 }
 
@@ -294,7 +350,7 @@ impl Piece {
         self.piece_type
     }
 
-    pub fn get_color(&self) -> Color {
+    pub fn get_color(&self) -> PieceColor {
         self.color
     }
 
@@ -310,7 +366,7 @@ impl fmt::Display for Piece {
         write!(
             f,
             "{}",
-            if self.color == Color::White {
+            if self.color == PieceColor::White {
                 c.to_uppercase()
             } else {
                 c
@@ -347,14 +403,14 @@ impl fmt::Display for PieceType {
 }
 
 #[derive(Copy, Clone, PartialEq)]
-pub enum Color {
+pub enum PieceColor {
     White,
     Black,
 }
 
-impl fmt::Display for Color {
+impl fmt::Display for PieceColor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Color::*;
+        use PieceColor::*;
 
         let c = match self {
             White => 'w',
