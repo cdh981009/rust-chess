@@ -2,11 +2,11 @@ use std::{fmt, mem::swap};
 
 use ggez::{
     glam::{vec2, Vec2},
-    graphics::{self, Image},
+    graphics::{self, Image, TextLayout, TextAlign},
     *,
 };
 
-use crate::game::*;
+use crate::{game::*, WINDOW_WIDTH};
 use crate::move_calculator;
 
 pub const BOARD_WIDTH: usize = 8;
@@ -15,7 +15,6 @@ pub const BOARD_SIZE_1D: usize = BOARD_WIDTH * BOARD_HEIGHT;
 
 #[derive(PartialEq)]
 enum TurnState {
-    ComputeMoves,
     Normal,
     Check,
 }
@@ -28,6 +27,7 @@ pub struct Board {
     is_movable: [bool; BOARD_SIZE_1D],
     current_turn_color: PieceColor,
     turn_state: TurnState,
+    is_moves_computed: bool,
 
     // fields for drawing
     position: Vec2,
@@ -44,7 +44,8 @@ impl Board {
             legal_moves: [[false; BOARD_SIZE_1D]; BOARD_SIZE_1D],
             is_movable: [false; BOARD_SIZE_1D],
             current_turn_color: PieceColor::White,
-            turn_state: TurnState::ComputeMoves,
+            turn_state: TurnState::Normal,
+            is_moves_computed: false,
 
             position,
             cell_size,
@@ -252,8 +253,15 @@ impl Board {
 
     fn change_turn(&mut self) {
         self.current_turn_color = self.current_turn_color.get_enemy_color();
-        self.turn_state = TurnState::ComputeMoves;
         self.selected_cell = None;
+
+        self.turn_state = if self.is_in_check(self.current_turn_color) {
+            TurnState::Check
+        } else {
+            TurnState::Normal
+        };
+
+        self.is_moves_computed = false;
     }
 
     fn compute_is_movable(&mut self) {
@@ -263,22 +271,25 @@ impl Board {
     }
 
     pub fn update(&mut self, mouse: &Mouse) {
-        if self.turn_state == TurnState::ComputeMoves {
+        if !self.is_moves_computed {
             self.compute_each_legal_moves();
             self.compute_is_movable();
+            self.is_moves_computed = true;
 
             // if no legal moves for all pieces
             //      if inCheck
             //          then checkmate -> current color loses
             //      else
             //          then stalemate -> draw
-            // else if there exists some legal move
-            //      self.turn_state = TurnState::Normal
 
             if !self.is_movable.contains(&true) {
+                // no legal moves
+                if self.turn_state == TurnState::Check {
+                    // checkmate
+                } else {
+                    // stalemate
+                }
             }
-
-            self.turn_state = TurnState::Normal;
         }
 
         if mouse.is_mouse_pressed(event::MouseButton::Left) {
@@ -311,14 +322,14 @@ impl Board {
         canvas: &mut graphics::Canvas,
         assets: &mut Assets,
     ) -> GameResult {
-        self.draw_turn(canvas);
+        self.draw_turn_state(canvas);
         self.draw_board(canvas, self.position, self.cell_size);
         self.draw_pieces(ctx, canvas, assets, self.position, self.cell_size);
 
         Ok(())
     }
 
-    fn draw_turn(&self, canvas: &mut graphics::Canvas) {
+    fn draw_turn_state(&self, canvas: &mut graphics::Canvas) {
         let turn_text = graphics::Text::new(format!(
             "{}'s turn",
             if self.current_turn_color == PieceColor::White {
@@ -331,17 +342,32 @@ impl Board {
         .set_scale(32.)
         .clone();
 
+        let check_text = graphics::Text::new("Check")
+            .set_scale(32.)
+            .set_layout(TextLayout { // right align
+                h_align: TextAlign::End,
+                v_align: TextAlign::Begin,
+            })
+            .clone();
+
         canvas.draw(
             &turn_text,
             graphics::DrawParam::from(vec2(15., 15.)).color(graphics::Color::from((0, 0, 0, 255))),
         );
+
+        if self.turn_state == TurnState::Check {
+            canvas.draw(
+                &check_text,
+                graphics::DrawParam::from(vec2(WINDOW_WIDTH - 15., 15.)).color(graphics::Color::from((0, 0, 0, 255))),
+            );
+        }
     }
 
     fn draw_board(&self, canvas: &mut graphics::Canvas, pos: Vec2, cell_size: f32) {
         let light_color = graphics::Color::from_rgb_u32(0x9699A1);
         let dark_color = graphics::Color::from_rgb_u32(0x434347);
         let select_color = graphics::Color::from_rgba_u32(0xFF000066);
-        let movable_color = graphics::Color::from_rgba_u32(0x00FF0033);
+        let movable_color = graphics::Color::from_rgba_u32(0x00FF0023);
 
         let scale = [cell_size, cell_size];
 
