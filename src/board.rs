@@ -2,12 +2,12 @@ use std::{fmt, mem::swap};
 
 use ggez::{
     glam::{vec2, Vec2},
-    graphics::{self, Image, TextLayout, TextAlign},
+    graphics::{self, Image, TextAlign, TextLayout},
     *,
 };
 
-use crate::{game::*, WINDOW_WIDTH};
 use crate::move_calculator;
+use crate::{game::*, WINDOW_WIDTH};
 
 pub const BOARD_WIDTH: usize = 8;
 pub const BOARD_HEIGHT: usize = 8;
@@ -17,6 +17,8 @@ pub const BOARD_SIZE_1D: usize = BOARD_WIDTH * BOARD_HEIGHT;
 enum TurnState {
     Normal,
     Check,
+    Checkmate,
+    Stalemate,
 }
 
 pub struct Board {
@@ -283,13 +285,14 @@ impl Board {
             //          then stalemate -> draw
 
             if !self.is_movable.contains(&true) {
-                // no legal moves
-                if self.turn_state == TurnState::Check {
-                    // checkmate
+                self.turn_state = if self.turn_state == TurnState::Check {
+                    TurnState::Checkmate
                 } else {
-                    // stalemate
-                }
+                    TurnState::Stalemate
+                };
             }
+
+            return;
         }
 
         if mouse.is_mouse_pressed(event::MouseButton::Left) {
@@ -342,23 +345,32 @@ impl Board {
         .set_scale(32.)
         .clone();
 
-        let check_text = graphics::Text::new("Check")
+        let current_state_text = match self.turn_state {
+            TurnState::Normal => "Normal",
+            TurnState::Check => "Check",
+            TurnState::Checkmate => "Checkmate",
+            TurnState::Stalemate => "Stalemate",
+        };
+
+        let check_text = graphics::Text::new(current_state_text)
             .set_scale(32.)
-            .set_layout(TextLayout { // right align
+            .set_layout(TextLayout {
+                // right align
                 h_align: TextAlign::End,
                 v_align: TextAlign::Begin,
             })
             .clone();
-
+        
         canvas.draw(
             &turn_text,
             graphics::DrawParam::from(vec2(15., 15.)).color(graphics::Color::from((0, 0, 0, 255))),
         );
 
-        if self.turn_state == TurnState::Check {
+        if self.turn_state != TurnState::Normal {
             canvas.draw(
                 &check_text,
-                graphics::DrawParam::from(vec2(WINDOW_WIDTH - 15., 15.)).color(graphics::Color::from((0, 0, 0, 255))),
+                graphics::DrawParam::from(vec2(WINDOW_WIDTH - 15., 15.))
+                    .color(graphics::Color::from((0, 0, 0, 255))),
             );
         }
     }
