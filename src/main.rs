@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::{env, path};
 
 mod board;
@@ -24,7 +26,8 @@ fn main() -> GameResult {
     let c = conf::Conf::new();
     let (mut ctx, event_loop) = ContextBuilder::new("rust_chess", "cdh981009")
         .default_conf(c)
-        .add_resource_path(resource_dir)
+        .add_zipfile_bytes(include_bytes!("../resources.zip").to_vec())
+        //.add_resource_path(resource_dir)
         .window_mode(conf::WindowMode::default().dimensions(WINDOW_WIDTH, WINDOW_HEIGHT))
         .build()
         .unwrap();
