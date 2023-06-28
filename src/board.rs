@@ -25,6 +25,7 @@ pub struct Board {
     board_state: [Option<Piece>; BOARD_SIZE_1D],
     selected_cell: Option<(usize, usize)>,
     legal_moves: [[bool; BOARD_SIZE_1D]; BOARD_SIZE_1D],
+    is_movable: [bool; BOARD_SIZE_1D],
     current_turn_color: PieceColor,
     turn_state: TurnState,
 
@@ -41,6 +42,7 @@ impl Board {
             board_state: [None; BOARD_SIZE_1D],
             selected_cell: None,
             legal_moves: [[false; BOARD_SIZE_1D]; BOARD_SIZE_1D],
+            is_movable: [false; BOARD_SIZE_1D],
             current_turn_color: PieceColor::White,
             turn_state: TurnState::ComputeMoves,
 
@@ -74,43 +76,41 @@ impl Board {
     }
 
     pub fn init(mut self) -> Self {
-        let config: &[u8] = "rnbqkbnr\
-                             pppppppp\
-                             --------\
-                             --------\
-                             --------\
-                             --------\
-                             PPPPPPPP\
-                             RNBQKBNR"
+        let setup: &[u8] = "rnbqkbnr\
+                            pppppppp\
+                            --------\
+                            --------\
+                            --------\
+                            --------\
+                            PPPPPPPP\
+                            RNBQKBNR"
             .as_bytes();
 
-        for y in 0..BOARD_HEIGHT {
-            for x in 0..BOARD_WIDTH {
-                let current = config[Board::to_index1d((x, y))] as char;
+        for (pos, curr) in setup.iter().enumerate() {
+            let curr = *curr as char;
 
-                let piece_type = match current {
-                    '-' => continue,
-                    'r' | 'R' => PieceType::Rook,
-                    'n' | 'N' => PieceType::Knight,
-                    'b' | 'B' => PieceType::Bishop,
-                    'q' | 'Q' => PieceType::Queen,
-                    'k' | 'K' => PieceType::King,
-                    'p' | 'P' => PieceType::Pawn,
-                    other => panic!("invalid board configuration: {other}"),
-                };
+            let piece_type = match curr {
+                '-' => continue,
+                'r' | 'R' => PieceType::Rook,
+                'n' | 'N' => PieceType::Knight,
+                'b' | 'B' => PieceType::Bishop,
+                'q' | 'Q' => PieceType::Queen,
+                'k' | 'K' => PieceType::King,
+                'p' | 'P' => PieceType::Pawn,
+                other => panic!("invalid board configuration: {other}"),
+            };
 
-                let color = if current.is_lowercase() {
-                    PieceColor::Black
-                } else {
-                    PieceColor::White
-                };
+            let color = if curr.is_lowercase() {
+                PieceColor::Black
+            } else {
+                PieceColor::White
+            };
 
-                self.board_state[Board::to_index1d((x, y))] = Some(Piece {
-                    piece_type,
-                    color,
-                    has_moved: false,
-                });
-            }
+            self.board_state[pos] = Some(Piece {
+                piece_type,
+                color,
+                has_moved: false,
+            });
         }
 
         self.print();
@@ -236,9 +236,15 @@ impl Board {
 
         for pos_1d in 0..BOARD_SIZE_1D {
             let Some(piece) = self.board_state[pos_1d] else { continue };
-            if piece.color != enemy_color { continue };
+            if piece.color != enemy_color {
+                continue;
+            };
 
-            move_calculator::get_moves(&self.board_state, Board::to_index2d(pos_1d), &mut enemy_moves);
+            move_calculator::get_moves(
+                &self.board_state,
+                Board::to_index2d(pos_1d),
+                &mut enemy_moves,
+            );
         }
 
         enemy_moves[kings_position]
@@ -250,9 +256,16 @@ impl Board {
         self.selected_cell = None;
     }
 
+    fn compute_is_movable(&mut self) {
+        for (pos, is_movable) in self.is_movable.iter_mut().enumerate() {
+            *is_movable = self.legal_moves[pos].contains(&true);
+        }
+    }
+
     pub fn update(&mut self, mouse: &Mouse) {
         if self.turn_state == TurnState::ComputeMoves {
             self.compute_each_legal_moves();
+            self.compute_is_movable();
 
             // if no legal moves for all pieces
             //      if inCheck
@@ -261,6 +274,9 @@ impl Board {
             //          then stalemate -> draw
             // else if there exists some legal move
             //      self.turn_state = TurnState::Normal
+
+            if !self.is_movable.contains(&true) {
+            }
 
             self.turn_state = TurnState::Normal;
         }
@@ -283,6 +299,8 @@ impl Board {
                     // select new piece on this cell
                     self.selected_cell = cell;
                 }
+            } else {
+                self.selected_cell = None;
             }
         }
     }
@@ -323,6 +341,7 @@ impl Board {
         let light_color = graphics::Color::from_rgb_u32(0x9699A1);
         let dark_color = graphics::Color::from_rgb_u32(0x434347);
         let select_color = graphics::Color::from_rgba_u32(0xFF000066);
+        let movable_color = graphics::Color::from_rgba_u32(0x00FF0033);
 
         let scale = [cell_size, cell_size];
 
@@ -351,8 +370,12 @@ impl Board {
                         [Board::to_index1d((cell_x, cell_y))]
                 });
 
+                let is_movable_piece = self.is_movable[Board::to_index1d((cell_x, cell_y))];
+
                 if is_selected_cell || is_movable_cell {
                     canvas.draw(&graphics::Quad, param.color(select_color));
+                } else if is_movable_piece {
+                    canvas.draw(&graphics::Quad, param.color(movable_color));
                 }
             }
         }
