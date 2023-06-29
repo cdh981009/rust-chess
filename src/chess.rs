@@ -1,3 +1,5 @@
+use std::iter;
+
 use ggez::{
     glam::{vec2, Vec2},
     graphics::{self, TextAlign, TextLayout},
@@ -291,9 +293,9 @@ impl Chess {
         let mut kings_position: Option<(usize, usize)> = None;
 
         // find king of the given color
-        for (x, col) in self.board.iter().enumerate() {
-            for (y, cell) in col.iter().enumerate() {
-                if cell.is_some_and(|piece| {
+        for x in 0..BOARD_WIDTH {
+            for y in 0..BOARD_HEIGHT {
+                if self.board[x][y].is_some_and(|piece| {
                     piece.get_color() == color && piece.get_piece_type() == PieceType::King
                 }) {
                     kings_position = Some((x, y));
@@ -352,11 +354,10 @@ impl Chess {
     }
 
     fn compute_is_movable(&mut self) {
-        let zipped = self
-            .is_movable
-            .iter_mut()
-            .flatten()
-            .zip(self.legal_moves.iter().flatten());
+        let zipped = iter::zip(
+            self.is_movable.iter_mut().flatten(),
+            self.legal_moves.iter().flatten(),
+        );
 
         // set is_movable[x][y] to true iff legal_moves[x][y] contains true
         for (is_movable, legal_moves) in zipped {
