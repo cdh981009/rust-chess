@@ -1,29 +1,25 @@
-use crate::chess::{Chess, BOARD_SIZE_1D};
+use crate::chess::{Board, Chess};
 use crate::piece::*;
 
-pub fn get_moves(
-    board: &[Option<Piece>; BOARD_SIZE_1D],
-    pos: (usize, usize),
-    moves: &mut [bool; BOARD_SIZE_1D],
-) {
-    let Some(piece) = &board[Chess::to_index1d(pos)] else { return };
+pub fn get_moves(board: &Board<Option<Piece>>, ind: (usize, usize), moves: &mut Board<bool>) {
+    let Some(piece) = &board[ind.0][ind.1] else { return };
 
     use PieceType::*;
     match piece.get_piece_type() {
-        Pawn { .. } => get_pawn_moves(piece, board, pos, moves),
-        Knight => get_knight_moves(piece, board, pos, moves),
-        Bishop => get_bishop_moves(piece, board, pos, moves),
-        Rook => get_rook_moves(piece, board, pos, moves),
-        Queen => get_queen_moves(piece, board, pos, moves),
-        King => get_king_moves(piece, board, pos, moves),
+        Pawn { .. } => get_pawn_moves(piece, board, ind, moves),
+        Knight => get_knight_moves(piece, board, ind, moves),
+        Bishop => get_bishop_moves(piece, board, ind, moves),
+        Rook => get_rook_moves(piece, board, ind, moves),
+        Queen => get_queen_moves(piece, board, ind, moves),
+        King => get_king_moves(piece, board, ind, moves),
     }
 }
 
 fn get_pawn_moves(
     piece: &Piece,
-    board: &[Option<Piece>; BOARD_SIZE_1D],
+    board: &Board<Option<Piece>>,
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_SIZE_1D],
+    moves: &mut Board<bool>,
 ) {
     // pawn move rule:
     // only can move forward. 2 if it's the first time, 1 otherwise.
@@ -40,10 +36,13 @@ fn get_pawn_moves(
     for move_y in 1..=reach {
         let (nx, ny) = (x as i32, y as i32 + move_y * y_direction);
 
-        if Chess::is_position_in_bound((nx, ny))
-            && Chess::is_empty_on(board, (nx as usize, ny as usize))
-        {
-            moves[Chess::to_index1d((nx as usize, ny as usize))] = true;
+        if !Chess::is_position_in_bound((nx, ny)) {
+            break;
+        }
+
+        let ind = (nx as usize, ny as usize);
+        if Chess::is_empty_on(board, ind) {
+            moves[ind.0][ind.1] = true;
         } else {
             break;
         }
@@ -59,23 +58,24 @@ fn get_pawn_moves(
             continue;
         }
 
-        let is_directly_attackable =
-            Chess::is_color_on(board, (nx as usize, ny as usize), enemy_color);
-        let can_en_passant = Chess::get_piece(board, (nx as usize, y)).is_some_and(|piece| {
+        let ind = (nx as usize, ny as usize);
+
+        let is_directly_attackable = Chess::is_color_on(board, ind, enemy_color);
+        let can_en_passant = board[ind.0][y].is_some_and(|piece| { // check x-adjacent cell
             matches!(piece.get_piece_type(), PieceType::Pawn { en_passant: true })
         });
 
         if is_directly_attackable || can_en_passant {
-            moves[Chess::to_index1d((nx as usize, ny as usize))] = true;
+            moves[ind.0][ind.1] = true;
         }
     }
 }
 
 fn get_knight_moves(
     piece: &Piece,
-    board: &[Option<Piece>; BOARD_SIZE_1D],
+    board: &Board<Option<Piece>>,
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_SIZE_1D],
+    moves: &mut Board<bool>,
 ) {
     static DIRS: [(i32, i32); 8] = [
         (-2, -1),
@@ -93,20 +93,23 @@ fn get_knight_moves(
     for (move_x, move_y) in DIRS {
         let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
 
-        if Chess::is_position_in_bound((nx, ny))
-            && (Chess::is_empty_on(board, (nx as usize, ny as usize))
-                || Chess::is_color_on(board, (nx as usize, ny as usize), enemy_color))
-        {
-            moves[Chess::to_index1d((nx as usize, ny as usize))] = true;
+        if !Chess::is_position_in_bound((nx, ny)) {
+            continue;
+        }
+
+        let ind = (nx as usize, ny as usize);
+
+        if Chess::is_empty_on(board, ind) || Chess::is_color_on(board, ind, enemy_color) {
+            moves[ind.0][ind.1] = true;
         }
     }
 }
 
 fn get_bishop_moves(
     piece: &Piece,
-    board: &[Option<Piece>; BOARD_SIZE_1D],
+    board: &Board<Option<Piece>>,
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_SIZE_1D],
+    moves: &mut Board<bool>,
 ) {
     let enemy_color = piece.get_color().get_enemy_color();
 
@@ -115,9 +118,9 @@ fn get_bishop_moves(
 
 fn get_rook_moves(
     piece: &Piece,
-    board: &[Option<Piece>; BOARD_SIZE_1D],
+    board: &Board<Option<Piece>>,
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_SIZE_1D],
+    moves: &mut Board<bool>,
 ) {
     let enemy_color = piece.get_color().get_enemy_color();
 
@@ -126,9 +129,9 @@ fn get_rook_moves(
 
 fn get_queen_moves(
     piece: &Piece,
-    board: &[Option<Piece>; BOARD_SIZE_1D],
+    board: &Board<Option<Piece>>,
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_SIZE_1D],
+    moves: &mut Board<bool>,
 ) {
     let enemy_color = piece.get_color().get_enemy_color();
 
@@ -138,9 +141,9 @@ fn get_queen_moves(
 
 fn get_king_moves(
     piece: &Piece,
-    board: &[Option<Piece>; BOARD_SIZE_1D],
+    board: &Board<Option<Piece>>,
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_SIZE_1D],
+    moves: &mut Board<bool>,
 ) {
     // todo: castling
 
@@ -154,22 +157,24 @@ fn get_king_moves(
 
             let (nx, ny) = (x as i32 + move_x, y as i32 + move_y);
 
-            if Chess::is_position_in_bound((nx, ny))
-                && (Chess::is_empty_on(board, (nx as usize, ny as usize))
-                    || Chess::is_color_on(board, (nx as usize, ny as usize), enemy_color))
-            {
-                moves[Chess::to_index1d((nx as usize, ny as usize))] = true;
+            if !Chess::is_position_in_bound((nx, ny)) {
+                continue;
+            }
+            let ind = (nx as usize, ny as usize);
+
+            if Chess::is_empty_on(board, ind) || Chess::is_color_on(board, ind, enemy_color) {
+                moves[ind.0][ind.1] = true;
             }
         }
     }
 }
 
 fn get_moves_in_direction(
-    board: &[Option<Piece>; BOARD_SIZE_1D],
+    board: &Board<Option<Piece>>,
     (x, y): (usize, usize),
     (x_dir, y_dir): (i32, i32),
     enemy_color: PieceColor,
-    moves: &mut [bool; BOARD_SIZE_1D],
+    moves: &mut Board<bool>,
 ) {
     let (mut nx, mut ny) = (x as i32, y as i32);
 
@@ -181,11 +186,13 @@ fn get_moves_in_direction(
             break;
         }
 
-        let is_empty = Chess::is_empty_on(board, (nx as usize, ny as usize));
-        let is_enemy = Chess::is_color_on(board, (nx as usize, ny as usize), enemy_color);
+        let ind = (nx as usize, ny as usize);
+
+        let is_empty = Chess::is_empty_on(board, ind);
+        let is_enemy = Chess::is_color_on(board, ind, enemy_color);
 
         if is_empty || is_enemy {
-            moves[Chess::to_index1d((nx as usize, ny as usize))] = true;
+            moves[ind.0][ind.1] = true;
         }
 
         if !is_empty {
@@ -195,10 +202,10 @@ fn get_moves_in_direction(
 }
 
 fn get_orthogonal_moves(
-    board: &[Option<Piece>; BOARD_SIZE_1D],
+    board: &Board<Option<Piece>>,
     (x, y): (usize, usize),
     enemy_color: PieceColor,
-    moves: &mut [bool; BOARD_SIZE_1D],
+    moves: &mut Board<bool>,
 ) {
     static DIRS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
@@ -208,10 +215,10 @@ fn get_orthogonal_moves(
 }
 
 fn get_diagonal_moves(
-    board: &[Option<Piece>; BOARD_SIZE_1D],
+    board: &Board<Option<Piece>>,
     (x, y): (usize, usize),
     enemy_color: PieceColor,
-    moves: &mut [bool; BOARD_SIZE_1D],
+    moves: &mut Board<bool>,
 ) {
     for x_dir in [-1, 1] {
         for y_dir in [-1, 1] {
