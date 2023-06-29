@@ -53,30 +53,7 @@ impl Board {
         }
     }
 
-    pub fn to_index1d((x, y): (usize, usize)) -> usize {
-        y * BOARD_WIDTH + x
-    }
-
-    pub fn to_index2d(ind: usize) -> (usize, usize) {
-        (ind % BOARD_WIDTH, ind / BOARD_WIDTH)
-    }
-
-    fn print(&self) {
-        for y in 0..BOARD_HEIGHT {
-            for x in 0..BOARD_WIDTH {
-                print!(
-                    "{}",
-                    if let Some(piece) = &self.board_state[Board::to_index1d((x, y))] {
-                        piece.to_string()
-                    } else {
-                        '_'.to_string()
-                    }
-                );
-            }
-            println!();
-        }
-    }
-
+    
     pub fn init(mut self) -> Self {
         let setup: &[u8] = "rnbqkbnr\
                             pppppppp\
@@ -114,6 +91,78 @@ impl Board {
         self.print();
 
         self
+    }
+
+    fn print(&self) {
+        for y in 0..BOARD_HEIGHT {
+            for x in 0..BOARD_WIDTH {
+                print!(
+                    "{}",
+                    if let Some(piece) = &self.board_state[Board::to_index1d((x, y))] {
+                        piece.to_string()
+                    } else {
+                        '_'.to_string()
+                    }
+                );
+            }
+            println!();
+        }
+    }
+
+    pub fn update(&mut self, mouse: &Mouse) {
+        if !self.is_moves_computed {
+            self.compute_each_legal_moves();
+            self.compute_is_movable();
+            self.is_moves_computed = true;
+
+            // if no legal moves for all pieces
+            //      if inCheck
+            //          then checkmate -> current color loses
+            //      else
+            //          then stalemate -> draw
+
+            if !self.is_movable.contains(&true) {
+                self.turn_state = if self.turn_state == TurnState::Check {
+                    TurnState::Checkmate
+                } else {
+                    TurnState::Stalemate
+                };
+            }
+
+            return;
+        }
+
+        if mouse.is_mouse_pressed(event::MouseButton::Left) {
+            let cell = self.try_select_cell(mouse);
+
+            if let Some(cell_position) = cell {
+                let is_movable = self.selected_cell.is_some_and(|selected_piece| {
+                    self.legal_moves[Board::to_index1d(selected_piece)]
+                        [Board::to_index1d(cell_position)]
+                });
+
+                if is_movable {
+                    // when there's a selected piece and newly-selected cell is one of it's possible moves
+                    // move the piece and change the turn
+                    self.move_piece(self.selected_cell.unwrap(), cell_position);
+                    self.post_move_update();
+                    self.change_turn();
+                } else {
+                    // select new piece on this cell
+                    self.selected_cell = cell;
+                }
+            } else {
+                self.selected_cell = None;
+            }
+        }
+    }
+
+    pub fn to_index1d((x, y): (usize, usize)) -> usize {
+        y * BOARD_WIDTH + x
+    }
+
+    pub fn to_index2d(ind: usize) -> (usize, usize) {
+        (ind % BOARD_WIDTH, ind / BOARD_WIDTH)
     }
 
     pub fn is_position_in_bound((x, y): (i32, i32)) -> bool {
@@ -249,9 +298,9 @@ impl Board {
 
         // find king of the given color
         for pos_1d in 0..BOARD_SIZE_1D {
-            if self.board_state[pos_1d]
-                .is_some_and(|piece| piece.get_color() == color && piece.get_piece_type() == PieceType::King)
-            {
+            if self.board_state[pos_1d].is_some_and(|piece| {
+                piece.get_color() == color && piece.get_piece_type() == PieceType::King
+            }) {
                 kings_position = Some(pos_1d);
                 break;
             }
@@ -311,54 +360,6 @@ impl Board {
     fn compute_is_movable(&mut self) {
         for (pos, is_movable) in self.is_movable.iter_mut().enumerate() {
             *is_movable = self.legal_moves[pos].contains(&true);
-        }
-    }
-
-    pub fn update(&mut self, mouse: &Mouse) {
-        if !self.is_moves_computed {
-            self.compute_each_legal_moves();
-            self.compute_is_movable();
-            self.is_moves_computed = true;
-
-            // if no legal moves for all pieces
-            //      if inCheck
-            //          then checkmate -> current color loses
-            //      else
-            //          then stalemate -> draw
-
-            if !self.is_movable.contains(&true) {
-                self.turn_state = if self.turn_state == TurnState::Check {
-                    TurnState::Checkmate
-                } else {
-                    TurnState::Stalemate
-                };
-            }
-
-            return;
-        }
-
-        if mouse.is_mouse_pressed(event::MouseButton::Left) {
-            let cell = self.try_select_cell(mouse);
-
-            if let Some(cell_position) = cell {
-                let is_movable = self.selected_cell.is_some_and(|selected_piece| {
-                    self.legal_moves[Board::to_index1d(selected_piece)]
-                        [Board::to_index1d(cell_position)]
-                });
-
-                if is_movable {
-                    // when there's a selected piece and newly-selected cell is one of it's possible moves
-                    // move the piece and change the turn
-                    self.move_piece(self.selected_cell.unwrap(), cell_position);
-                    self.post_move_update();
-                    self.change_turn();
-                } else {
-                    // select new piece on this cell
-                    self.selected_cell = cell;
-                }
-            } else {
-                self.selected_cell = None;
-            }
         }
     }
 
