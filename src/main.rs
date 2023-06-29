@@ -1,10 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{env, path};
-
 mod board;
 mod game;
 mod move_calculator;
+mod piece;
 
 use game::MainState;
 use ggez::*;

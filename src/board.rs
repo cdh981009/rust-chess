@@ -1,5 +1,3 @@
-use std::{fmt, mem::swap};
-
 use ggez::{
     glam::{vec2, Vec2},
     graphics::{self, Image, TextAlign, TextLayout},
@@ -7,6 +5,7 @@ use ggez::{
 };
 
 use crate::move_calculator;
+use crate::piece::*;
 use crate::{game::*, WINDOW_WIDTH};
 
 pub const BOARD_WIDTH: usize = 8;
@@ -109,11 +108,7 @@ impl Board {
                 PieceColor::White
             };
 
-            self.board_state[pos] = Some(Piece {
-                piece_type,
-                color,
-                has_moved: false,
-            });
+            self.board_state[pos] = Some(Piece::new(piece_type, color));
         }
 
         self.print();
@@ -135,7 +130,7 @@ impl Board {
         color: PieceColor,
     ) -> bool {
         let Some(piece) = board_state[Board::to_index1d(pos)] else { return false; };
-        piece.color == color
+        piece.get_color() == color
     }
 
     pub fn get_piece(
@@ -171,7 +166,7 @@ impl Board {
 
         let Some(src_piece) = &mut src else { panic!("{:?} should contain a piece", from) };
 
-        src_piece.has_moved = true;
+        src_piece.set_has_moved(true);
 
         let mut eliminated = self.board_state[to_1d];
         let mut eliminated_position = to;
@@ -255,7 +250,7 @@ impl Board {
         // find king of the given color
         for pos_1d in 0..BOARD_SIZE_1D {
             if self.board_state[pos_1d]
-                .is_some_and(|piece| piece.color == color && piece.piece_type == PieceType::King)
+                .is_some_and(|piece| piece.get_color() == color && piece.get_piece_type() == PieceType::King)
             {
                 kings_position = Some(pos_1d);
                 break;
@@ -270,7 +265,7 @@ impl Board {
 
         for pos_1d in 0..BOARD_SIZE_1D {
             let Some(piece) = self.board_state[pos_1d] else { continue };
-            if piece.color != enemy_color {
+            if piece.get_color() != enemy_color {
                 continue;
             };
 
@@ -496,107 +491,5 @@ impl Board {
                 }
             }
         }
-    }
-}
-
-#[derive(Copy, Clone)]
-pub struct Piece {
-    piece_type: PieceType,
-    color: PieceColor,
-    has_moved: bool,
-}
-
-impl Piece {
-    fn get_image<'a>(&self, ctx: &mut Context, assets: &'a mut Assets) -> &'a Image {
-        let sprite = self.color.to_string() + &self.piece_type.to_string();
-
-        assets.try_get_image(ctx, &sprite).unwrap()
-    }
-
-    pub fn get_piece_type(&self) -> PieceType {
-        self.piece_type
-    }
-
-    pub fn get_piece_type_mut(&mut self) -> &mut PieceType {
-        &mut self.piece_type
-    }
-
-    pub fn get_color(&self) -> PieceColor {
-        self.color
-    }
-
-    pub fn has_moved(&self) -> bool {
-        self.has_moved
-    }
-}
-
-impl fmt::Display for Piece {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let c = self.piece_type.to_string();
-
-        write!(
-            f,
-            "{}",
-            if self.color == PieceColor::White {
-                c.to_uppercase()
-            } else {
-                c
-            }
-        )
-    }
-}
-
-#[derive(PartialEq, Copy, Clone)]
-pub enum PieceType {
-    Pawn { en_passant: bool },
-    Rook,
-    Bishop,
-    Knight,
-    King,
-    Queen,
-}
-
-impl fmt::Display for PieceType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use PieceType::*;
-
-        let c = match self {
-            Pawn { .. } => 'p',
-            Rook => 'r',
-            Bishop => 'b',
-            Knight => 'n',
-            King => 'k',
-            Queen => 'q',
-        };
-
-        write!(f, "{c}")
-    }
-}
-
-#[derive(Copy, Clone, PartialEq)]
-pub enum PieceColor {
-    White,
-    Black,
-}
-
-impl PieceColor {
-    pub fn get_enemy_color(&self) -> PieceColor {
-        match *self {
-            PieceColor::White => PieceColor::Black,
-            PieceColor::Black => PieceColor::White,
-        }
-    }
-}
-
-impl fmt::Display for PieceColor {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use PieceColor::*;
-
-        let c = match self {
-            White => 'w',
-            Black => 'b',
-        };
-
-        write!(f, "{c}")
     }
 }

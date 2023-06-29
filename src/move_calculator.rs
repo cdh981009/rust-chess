@@ -1,4 +1,5 @@
-use crate::board::*;
+use crate::board::{Board, BOARD_WIDTH, BOARD_HEIGHT, BOARD_SIZE_1D};
+use crate::piece::*;
 
 pub fn get_moves(
     board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
