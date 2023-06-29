@@ -1,6 +1,6 @@
 use ggez::{
     glam::{vec2, Vec2},
-    graphics::{self, Image, TextAlign, TextLayout},
+    graphics::{self, TextAlign, TextLayout},
     *,
 };
 

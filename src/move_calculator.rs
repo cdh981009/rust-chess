@@ -1,10 +1,10 @@
-use crate::board::{Board, BOARD_WIDTH, BOARD_HEIGHT, BOARD_SIZE_1D};
+use crate::board::{Board, BOARD_SIZE_1D};
 use crate::piece::*;
 
 pub fn get_moves(
-    board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: &[Option<Piece>; BOARD_SIZE_1D],
     pos: (usize, usize),
-    moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    moves: &mut [bool; BOARD_SIZE_1D],
 ) {
     let Some(piece) = &board_state[Board::to_index1d(pos)] else { return };
 
@@ -21,9 +21,9 @@ pub fn get_moves(
 
 fn get_pawn_moves(
     piece: &Piece,
-    board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: &[Option<Piece>; BOARD_SIZE_1D],
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    moves: &mut [bool; BOARD_SIZE_1D],
 ) {
     // pawn move rule:
     // only can move forward. 2 if it's the first time, 1 otherwise.
@@ -73,9 +73,9 @@ fn get_pawn_moves(
 
 fn get_knight_moves(
     piece: &Piece,
-    board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: &[Option<Piece>; BOARD_SIZE_1D],
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    moves: &mut [bool; BOARD_SIZE_1D],
 ) {
     static DIRS: [(i32, i32); 8] = [
         (-2, -1),
@@ -104,9 +104,9 @@ fn get_knight_moves(
 
 fn get_bishop_moves(
     piece: &Piece,
-    board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: &[Option<Piece>; BOARD_SIZE_1D],
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    moves: &mut [bool; BOARD_SIZE_1D],
 ) {
     let enemy_color = piece.get_color().get_enemy_color();
 
@@ -115,9 +115,9 @@ fn get_bishop_moves(
 
 fn get_rook_moves(
     piece: &Piece,
-    board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: &[Option<Piece>; BOARD_SIZE_1D],
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    moves: &mut [bool; BOARD_SIZE_1D],
 ) {
     let enemy_color = piece.get_color().get_enemy_color();
 
@@ -126,9 +126,9 @@ fn get_rook_moves(
 
 fn get_queen_moves(
     piece: &Piece,
-    board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: &[Option<Piece>; BOARD_SIZE_1D],
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    moves: &mut [bool; BOARD_SIZE_1D],
 ) {
     let enemy_color = piece.get_color().get_enemy_color();
 
@@ -138,9 +138,9 @@ fn get_queen_moves(
 
 fn get_king_moves(
     piece: &Piece,
-    board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: &[Option<Piece>; BOARD_SIZE_1D],
     (x, y): (usize, usize),
-    moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    moves: &mut [bool; BOARD_SIZE_1D],
 ) {
     // todo: castling
 
@@ -165,11 +165,11 @@ fn get_king_moves(
 }
 
 fn get_moves_in_direction(
-    board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: &[Option<Piece>; BOARD_SIZE_1D],
     (x, y): (usize, usize),
     (x_dir, y_dir): (i32, i32),
     enemy_color: PieceColor,
-    moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    moves: &mut [bool; BOARD_SIZE_1D],
 ) {
     let (mut nx, mut ny) = (x as i32, y as i32);
 
@@ -195,10 +195,10 @@ fn get_moves_in_direction(
 }
 
 fn get_orthogonal_moves(
-    board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: &[Option<Piece>; BOARD_SIZE_1D],
     (x, y): (usize, usize),
     enemy_color: PieceColor,
-    moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    moves: &mut [bool; BOARD_SIZE_1D],
 ) {
     static DIRS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
@@ -208,10 +208,10 @@ fn get_orthogonal_moves(
 }
 
 fn get_diagonal_moves(
-    board_state: &[Option<Piece>; BOARD_WIDTH * BOARD_HEIGHT],
+    board_state: &[Option<Piece>; BOARD_SIZE_1D],
     (x, y): (usize, usize),
     enemy_color: PieceColor,
-    moves: &mut [bool; BOARD_WIDTH * BOARD_HEIGHT],
+    moves: &mut [bool; BOARD_SIZE_1D],
 ) {
     for x_dir in [-1, 1] {
         for y_dir in [-1, 1] {

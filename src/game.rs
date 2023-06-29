@@ -9,7 +9,7 @@ pub struct Assets {
 }
 
 impl Assets {
-    fn new(ctx: &mut Context) -> Assets {
+    fn new(_ctx: &mut Context) -> Assets {
         let images = HashMap::new();
         Assets { images }
     }
@@ -35,11 +35,11 @@ pub struct Mouse {
 
 impl Mouse {
     fn update(&mut self) {
-        for (key, val) in self.is_mouse_pressed.iter_mut() {
+        for (_key, val) in self.is_mouse_pressed.iter_mut() {
             *val = false;
         }
 
-        for (key, val) in self.is_mouse_released.iter_mut() {
+        for (_key, val) in self.is_mouse_released.iter_mut() {
             *val = false;
         }
     }
@@ -114,8 +114,8 @@ impl ggez::event::EventHandler<GameError> for MainState {
         &mut self,
         _ctx: &mut Context,
         button: MouseButton,
-        x: f32,
-        y: f32,
+        _x: f32,
+        _y: f32,
     ) -> GameResult {
         self.mouse.is_mouse_down.insert(button, true);
         self.mouse.is_mouse_pressed.insert(button, true);
@@ -128,8 +128,8 @@ impl ggez::event::EventHandler<GameError> for MainState {
         &mut self,
         _ctx: &mut Context,
         button: MouseButton,
-        x: f32,
-        y: f32,
+        _x: f32,
+        _y: f32,
     ) -> GameResult {
         self.mouse.is_mouse_down.insert(button, false);
         // println!("Mouse button released: {button:?}, x: {x}, y: {y}");
@@ -142,8 +142,8 @@ impl ggez::event::EventHandler<GameError> for MainState {
         _ctx: &mut Context,
         x: f32,
         y: f32,
-        xrel: f32,
-        yrel: f32,
+        _xrel: f32,
+        _yrel: f32,
     ) -> GameResult {
         self.mouse.position.x = x;
         self.mouse.position.y = y;
