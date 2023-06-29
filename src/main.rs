@@ -15,13 +15,13 @@ const WINDOW_HEIGHT: f32 = 800.0;
 fn main() -> GameResult {
     // We add the CARGO_MANIFEST_DIR/resources to the resource paths
     // so that ggez will look in our cargo project directory for files.
-    let resource_dir = if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
-        let mut path = path::PathBuf::from(manifest_dir);
-        path.push("resources");
-        path
-    } else {
-        path::PathBuf::from("./resources")
-    };
+    // let resource_dir = if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+    //     let mut path = path::PathBuf::from(manifest_dir);
+    //     path.push("resources");
+    //     path
+    // } else {
+    //     path::PathBuf::from("./resources")
+    // };
 
     let c = conf::Conf::new();
     let (mut ctx, event_loop) = ContextBuilder::new("rust_chess", "cdh981009")
