@@ -9,7 +9,7 @@ pub fn get_moves(
 
     use PieceType::*;
     match piece.get_piece_type() {
-        Pawn => get_pawn_moves(piece, board_state, pos, moves),
+        Pawn { .. } => get_pawn_moves(piece, board_state, pos, moves),
         Knight => get_knight_moves(piece, board_state, pos, moves),
         Bishop => get_bishop_moves(piece, board_state, pos, moves),
         Rook => get_rook_moves(piece, board_state, pos, moves),
@@ -54,9 +54,17 @@ fn get_pawn_moves(
     for move_x in [-1, 1] {
         let (nx, ny) = (x as i32 + move_x, y as i32 + y_direction);
 
-        if Board::is_position_in_bound((nx, ny))
-            && Board::is_color_on(board_state, (nx as usize, ny as usize), enemy_color)
-        {
+        if !Board::is_position_in_bound((nx, ny)) {
+            continue;
+        }
+
+        let is_directly_attackable =
+            Board::is_color_on(board_state, (nx as usize, ny as usize), enemy_color);
+        let can_en_passant = Board::get_piece(board_state, (nx as usize, y)).is_some_and(|piece| {
+            matches!(piece.get_piece_type(), PieceType::Pawn { en_passant: true })
+        });
+
+        if is_directly_attackable || can_en_passant {
             moves[Board::to_index1d((nx as usize, ny as usize))] = true;
         }
     }

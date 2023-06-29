@@ -99,7 +99,7 @@ impl Board {
                 'b' | 'B' => PieceType::Bishop,
                 'q' | 'Q' => PieceType::Queen,
                 'k' | 'K' => PieceType::King,
-                'p' | 'P' => PieceType::Pawn,
+                'p' | 'P' => PieceType::Pawn { en_passant: false },
                 other => panic!("invalid board configuration: {other}"),
             };
 
@@ -138,8 +138,11 @@ impl Board {
         piece.color == color
     }
 
-    pub fn get_piece(&self, pos: (usize, usize)) -> &Option<Piece> {
-        &self.board_state[Board::to_index1d(pos)]
+    pub fn get_piece(
+        board_state: &[Option<Piece>; BOARD_SIZE_1D],
+        pos: (usize, usize),
+    ) -> &Option<Piece> {
+        &board_state[Board::to_index1d(pos)]
     }
 
     fn try_select_cell(&self, mouse: &Mouse) -> Option<(usize, usize)> {
@@ -155,21 +158,48 @@ impl Board {
         None
     }
 
-    // move piece and return the piece previously on the destination
-    fn move_piece(&mut self, from: (usize, usize), to: (usize, usize)) -> Option<Piece> {
+    // move piece and return eliminated piece and its position if exists (return position for en passant's special case)
+    fn move_piece(
+        &mut self,
+        from: (usize, usize),
+        to: (usize, usize),
+    ) -> (Option<Piece>, (usize, usize)) {
         let from_1d = Board::to_index1d(from);
         let to_1d = Board::to_index1d(to);
 
         let mut src = self.board_state[from_1d];
-        let dst = self.board_state[to_1d];
 
         let Some(src_piece) = &mut src else { panic!("{:?} should contain a piece", from) };
+
         src_piece.has_moved = true;
 
+        let mut eliminated = self.board_state[to_1d];
+        let mut eliminated_position = to;
+
+        // handle special case: en passant
+        if let PieceType::Pawn { en_passant } = src_piece.get_piece_type_mut() {
+            if from.0 != to.0 {
+                // en passant attack
+                let en_passant_target = self.board_state[Board::to_index1d((to.0, from.1))];
+
+                if en_passant_target.is_some_and(|enemy| {
+                    enemy.get_color() != src_piece.get_color()
+                        && matches!(enemy.get_piece_type(), PieceType::Pawn { en_passant: true })
+                }) {
+                    eliminated = en_passant_target;
+                    eliminated_position = (to.0, from.1);
+                }
+            } else if from.1.abs_diff(to.1) == 2 {
+                // en passant move
+                *en_passant = true;
+            }
+        }
+
         self.board_state[from_1d] = None;
+        self.board_state[Board::to_index1d(eliminated_position)] = None;
         self.board_state[to_1d] = src;
 
-        dst
+        (eliminated, eliminated_position)
     }
 
     // compute and populate each piece's legal moves
@@ -204,7 +234,7 @@ impl Board {
 
             // temporarily move the piece to the destination
             let original_src = self.board_state[src_pos_1d];
-            let original_dst = self.move_piece(from, to);
+            let (eliminated, eliminated_position) = self.move_piece(from, to);
 
             if self.is_in_check(self.current_turn_color) {
                 moves[dst_pos_1d] = false;
@@ -212,7 +242,8 @@ impl Board {
 
             // recover the original state
             self.board_state[src_pos_1d] = original_src;
-            self.board_state[dst_pos_1d] = original_dst;
+            self.board_state[dst_pos_1d] = None;
+            self.board_state[Board::to_index1d(eliminated_position)] = eliminated;
         }
 
         self.legal_moves[src_pos_1d] = moves;
@@ -251,6 +282,22 @@ impl Board {
         }
 
         enemy_moves[kings_position]
+    }
+
+    fn post_move_update(&mut self) {
+        for cell in self.board_state.iter_mut() {
+            let Some(piece) = cell else { continue };
+
+            // update en passant
+            match (piece.get_color(), piece.get_piece_type_mut()) {
+                (color, PieceType::Pawn { en_passant })
+                    if color == self.current_turn_color.get_enemy_color() =>
+                {
+                    *en_passant = false;
+                }
+                _ => {}
+            }
+        }
     }
 
     fn change_turn(&mut self) {
@@ -308,6 +355,7 @@ impl Board {
                     // when there's a selected piece and newly-selected cell is one of it's possible moves
                     // move the piece and change the turn
                     self.move_piece(self.selected_cell.unwrap(), cell_position);
+                    self.post_move_update();
                     self.change_turn();
                 } else {
                     // select new piece on this cell
@@ -360,7 +408,7 @@ impl Board {
                 v_align: TextAlign::Begin,
             })
             .clone();
-        
+
         canvas.draw(
             &turn_text,
             graphics::DrawParam::from(vec2(15., 15.)).color(graphics::Color::from((0, 0, 0, 255))),
@@ -469,6 +517,10 @@ impl Piece {
         self.piece_type
     }
 
+    pub fn get_piece_type_mut(&mut self) -> &mut PieceType {
+        &mut self.piece_type
+    }
+
     pub fn get_color(&self) -> PieceColor {
         self.color
     }
@@ -496,7 +548,7 @@ impl fmt::Display for Piece {
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum PieceType {
-    Pawn,
+    Pawn { en_passant: bool },
     Rook,
     Bishop,
     Knight,
@@ -509,7 +561,7 @@ impl fmt::Display for PieceType {
         use PieceType::*;
 
         let c = match self {
-            Pawn => 'p',
+            Pawn { .. } => 'p',
             Rook => 'r',
             Bishop => 'b',
             Knight => 'n',
