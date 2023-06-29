@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ggez::{event::MouseButton, glam::Vec2, graphics::Image, *};
 
-use crate::board::*;
+use crate::chess::*;
 
 pub struct Assets {
     images: HashMap<String, Image>,
@@ -64,7 +64,7 @@ impl Mouse {
 pub struct MainState {
     screen_width: f32,
     screen_height: f32,
-    board: Board,
+    board: Chess,
     assets: Assets,
     mouse: Mouse,
 }
@@ -74,7 +74,7 @@ impl MainState {
         let (screen_width, screen_height) = ctx.gfx.drawable_size();
 
         let board_position = Vec2::new(80.0, 80.0);
-        let board = Board::new(board_position).init();
+        let board = Chess::new(board_position).init();
 
         let assets = Assets::new(ctx);
         let mouse = Default::default();

@@ -20,9 +20,9 @@ enum TurnState {
     Stalemate,
 }
 
-pub struct Board {
+pub struct Chess {
     // fields for game logic
-    board_state: [Option<Piece>; BOARD_SIZE_1D],
+    board: [Option<Piece>; BOARD_SIZE_1D],
     selected_cell: Option<(usize, usize)>,
     legal_moves: [[bool; BOARD_SIZE_1D]; BOARD_SIZE_1D],
     is_movable: [bool; BOARD_SIZE_1D],
@@ -35,12 +35,12 @@ pub struct Board {
     cell_size: f32,
 }
 
-impl Board {
+impl Chess {
     pub fn new(position: Vec2) -> Self {
         let cell_size = 80.0;
 
-        Board {
-            board_state: [None; BOARD_SIZE_1D],
+        Chess {
+            board: [None; BOARD_SIZE_1D],
             selected_cell: None,
             legal_moves: [[false; BOARD_SIZE_1D]; BOARD_SIZE_1D],
             is_movable: [false; BOARD_SIZE_1D],
@@ -85,7 +85,7 @@ impl Board {
                 PieceColor::White
             };
 
-            self.board_state[pos] = Some(Piece::new(piece_type, color));
+            self.board[pos] = Some(Piece::new(piece_type, color));
         }
 
         self.print();
@@ -98,7 +98,7 @@ impl Board {
             for x in 0..BOARD_WIDTH {
                 print!(
                     "{}",
-                    if let Some(piece) = &self.board_state[Board::to_index1d((x, y))] {
+                    if let Some(piece) = &self.board[Chess::to_index1d((x, y))] {
                         piece.to_string()
                     } else {
                         '_'.to_string()
@@ -137,8 +137,8 @@ impl Board {
 
             if let Some(cell_position) = cell {
                 let is_movable = self.selected_cell.is_some_and(|selected_piece| {
-                    self.legal_moves[Board::to_index1d(selected_piece)]
-                        [Board::to_index1d(cell_position)]
+                    self.legal_moves[Chess::to_index1d(selected_piece)]
+                        [Chess::to_index1d(cell_position)]
                 });
 
                 if is_movable {
@@ -170,7 +170,7 @@ impl Board {
     }
 
     pub fn is_empty_on(board_state: &[Option<Piece>; BOARD_SIZE_1D], pos: (usize, usize)) -> bool {
-        board_state[Board::to_index1d(pos)].is_none()
+        board_state[Chess::to_index1d(pos)].is_none()
     }
 
     pub fn is_color_on(
@@ -178,7 +178,7 @@ impl Board {
         pos: (usize, usize),
         color: PieceColor,
     ) -> bool {
-        let Some(piece) = board_state[Board::to_index1d(pos)] else { return false; };
+        let Some(piece) = board_state[Chess::to_index1d(pos)] else { return false; };
         piece.get_color() == color
     }
 
@@ -186,7 +186,7 @@ impl Board {
         board_state: &[Option<Piece>; BOARD_SIZE_1D],
         pos: (usize, usize),
     ) -> &Option<Piece> {
-        &board_state[Board::to_index1d(pos)]
+        &board_state[Chess::to_index1d(pos)]
     }
 
     fn try_select_cell(&self, mouse: &Mouse) -> Option<(usize, usize)> {
@@ -195,7 +195,7 @@ impl Board {
 
         let (x, y) = (m_cell.x as i32, m_cell.y as i32);
 
-        if Board::is_position_in_bound((x, y)) {
+        if Chess::is_position_in_bound((x, y)) {
             return Some((x as usize, y as usize));
         }
 
@@ -208,23 +208,23 @@ impl Board {
         from: (usize, usize),
         to: (usize, usize),
     ) -> (Option<Piece>, (usize, usize)) {
-        let from_1d = Board::to_index1d(from);
-        let to_1d = Board::to_index1d(to);
+        let from_1d = Chess::to_index1d(from);
+        let to_1d = Chess::to_index1d(to);
 
-        let mut src = self.board_state[from_1d];
+        let mut src = self.board[from_1d];
 
         let Some(src_piece) = &mut src else { panic!("{:?} should contain a piece", from) };
 
         src_piece.set_has_moved(true);
 
-        let mut eliminated = self.board_state[to_1d];
+        let mut eliminated = self.board[to_1d];
         let mut eliminated_position = to;
 
         // handle special case: en passant
         if let PieceType::Pawn { en_passant } = src_piece.get_piece_type_mut() {
             if from.0 != to.0 {
                 // en passant attack
-                let en_passant_target = self.board_state[Board::to_index1d((to.0, from.1))];
+                let en_passant_target = self.board[Chess::to_index1d((to.0, from.1))];
 
                 if en_passant_target.is_some_and(|enemy| {
                     enemy.get_color() != src_piece.get_color()
@@ -239,9 +239,9 @@ impl Board {
             }
         }
 
-        self.board_state[from_1d] = None;
-        self.board_state[Board::to_index1d(eliminated_position)] = None;
-        self.board_state[to_1d] = src;
+        self.board[from_1d] = None;
+        self.board[Chess::to_index1d(eliminated_position)] = None;
+        self.board[to_1d] = src;
 
         (eliminated, eliminated_position)
     }
@@ -253,13 +253,13 @@ impl Board {
 
         // iterate each piece of current turn and compute its legal moves
         for pos_1d in 0..BOARD_SIZE_1D {
-            let pos_2d = Board::to_index2d(pos_1d);
+            let pos_2d = Chess::to_index2d(pos_1d);
 
-            if !Board::is_color_on(&self.board_state, pos_2d, self.current_turn_color) {
+            if !Chess::is_color_on(&self.board, pos_2d, self.current_turn_color) {
                 continue;
             }
 
-            move_calculator::get_moves(&self.board_state, pos_2d, &mut self.legal_moves[pos_1d]);
+            move_calculator::get_moves(&self.board, pos_2d, &mut self.legal_moves[pos_1d]);
 
             self.eliminate_illegal_moves(pos_1d);
         }
@@ -273,11 +273,11 @@ impl Board {
                 continue;
             }
 
-            let from = Board::to_index2d(src_pos_1d);
-            let to = Board::to_index2d(dst_pos_1d);
+            let from = Chess::to_index2d(src_pos_1d);
+            let to = Chess::to_index2d(dst_pos_1d);
 
             // temporarily move the piece to the destination
-            let original_src = self.board_state[src_pos_1d];
+            let original_src = self.board[src_pos_1d];
             let (eliminated, eliminated_position) = self.move_piece(from, to);
 
             if self.is_in_check(self.current_turn_color) {
@@ -285,9 +285,9 @@ impl Board {
             }
 
             // recover the original state
-            self.board_state[src_pos_1d] = original_src;
-            self.board_state[dst_pos_1d] = None;
-            self.board_state[Board::to_index1d(eliminated_position)] = eliminated;
+            self.board[src_pos_1d] = original_src;
+            self.board[dst_pos_1d] = None;
+            self.board[Chess::to_index1d(eliminated_position)] = eliminated;
         }
 
         self.legal_moves[src_pos_1d] = moves;
@@ -298,7 +298,7 @@ impl Board {
 
         // find king of the given color
         for pos_1d in 0..BOARD_SIZE_1D {
-            if self.board_state[pos_1d].is_some_and(|piece| {
+            if self.board[pos_1d].is_some_and(|piece| {
                 piece.get_color() == color && piece.get_piece_type() == PieceType::King
             }) {
                 kings_position = Some(pos_1d);
@@ -313,14 +313,14 @@ impl Board {
         let mut enemy_moves = [false; BOARD_SIZE_1D];
 
         for pos_1d in 0..BOARD_SIZE_1D {
-            let Some(piece) = self.board_state[pos_1d] else { continue };
+            let Some(piece) = self.board[pos_1d] else { continue };
             if piece.get_color() != enemy_color {
                 continue;
             };
 
             move_calculator::get_moves(
-                &self.board_state,
-                Board::to_index2d(pos_1d),
+                &self.board,
+                Chess::to_index2d(pos_1d),
                 &mut enemy_moves,
             );
         }
@@ -329,7 +329,7 @@ impl Board {
     }
 
     fn post_move_update(&mut self) {
-        for cell in self.board_state.iter_mut() {
+        for cell in self.board.iter_mut() {
             let Some(piece) = cell else { continue };
 
             // update en passant
@@ -448,11 +448,11 @@ impl Board {
                     .is_some_and(|(sx, sy)| (sx, sy) == (cell_x, cell_y));
 
                 let is_movable_cell = self.selected_cell.is_some_and(|selected| {
-                    self.legal_moves[Board::to_index1d(selected)]
-                        [Board::to_index1d((cell_x, cell_y))]
+                    self.legal_moves[Chess::to_index1d(selected)]
+                        [Chess::to_index1d((cell_x, cell_y))]
                 });
 
-                let is_movable_piece = self.is_movable[Board::to_index1d((cell_x, cell_y))];
+                let is_movable_piece = self.is_movable[Chess::to_index1d((cell_x, cell_y))];
 
                 if is_selected_cell || is_movable_cell {
                     canvas.draw(&graphics::Quad, param.color(select_color));
@@ -475,7 +475,7 @@ impl Board {
 
         for cell_x in 0..BOARD_WIDTH {
             for cell_y in 0..BOARD_HEIGHT {
-                if let Some(piece) = &self.board_state[Board::to_index1d((cell_x, cell_y))] {
+                if let Some(piece) = &self.board[Chess::to_index1d((cell_x, cell_y))] {
                     // set pos to the center of the cell
                     let cell_pos = pos + vec2(cell_size * cell_x as f32, cell_size * cell_y as f32);
                     let cell_pos_centered = cell_pos + vec2(cell_size / 2.0, cell_size / 2.0);
