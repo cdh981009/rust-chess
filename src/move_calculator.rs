@@ -2,7 +2,7 @@ use crate::chess::{Board, Chess, BOARD_HEIGHT, BOARD_WIDTH};
 use crate::game::Assets;
 use crate::piece::*;
 
-pub fn get_moves(board: &Board<Option<Piece>>, ind: (usize, usize), moves: &mut Board<bool>) {
+pub fn get_pseudo_legal_moves(board: &Board<Option<Piece>>, ind: (usize, usize), moves: &mut Board<bool>) {
     let Some(piece) = &board[ind.0][ind.1] else { return };
 
     use PieceType::*;
@@ -25,7 +25,7 @@ pub fn get_all_attacks(board: &Board<Option<Piece>>, color: PieceColor) -> Board
                 continue;
             }
 
-            get_moves(board, (x, y), &mut attacks);
+            get_pseudo_legal_moves(board, (x, y), &mut attacks);
         }
     }
 
@@ -197,21 +197,26 @@ fn get_king_moves(
         assert_eq!((x, y), (4, rank), "king cannot exist at {:?}", (x, y));
 
         // king side
-        moves[x + 2][y] = can_castle(board, (x, y), 1);
-       // queen side
-        moves[x - 2][y] = can_castle(board, (x, y), -1);
+        moves[x + 2][y] = can_castle(board, (x, y), piece.get_color(), 1);
+        // queen side
+        moves[x - 2][y] = can_castle(board, (x, y), piece.get_color(), -1);
     }
 }
 
 fn can_castle(
     board: &Board<Option<Piece>>,
     (x, y): (usize, usize),
+    color: PieceColor,
     x_dir: i32,
 ) -> bool {
     let mut nx = x;
 
     let is_castlable_rook = |cell: &Option<Piece>| -> bool {
-        cell.is_some_and(|piece| piece.get_piece_type() == PieceType::Rook && !piece.has_moved())
+        cell.is_some_and(|piece| {
+            piece.get_piece_type() == PieceType::Rook
+                && piece.get_color() == color
+                && !piece.has_moved()
+        })
     };
 
     loop {

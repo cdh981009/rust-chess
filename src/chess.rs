@@ -273,7 +273,11 @@ impl Chess {
                     continue;
                 }
 
-                move_calculator::get_moves(&self.board, (x, y), &mut self.legal_moves[x][y]);
+                move_calculator::get_pseudo_legal_moves(
+                    &self.board,
+                    (x, y),
+                    &mut self.legal_moves[x][y],
+                );
 
                 self.eliminate_illegal_moves((x, y));
             }
@@ -304,7 +308,52 @@ impl Chess {
             }
         }
 
+        // special case: check illegal moves for castling
+        self.eliminate_castling_illegal_moves(from, &mut moves, &board_saved);
+
         self.legal_moves[from.0][from.1] = moves;
+    }
+
+    fn eliminate_castling_illegal_moves(
+        &mut self,
+        from: (usize, usize),
+        moves: &mut Board<bool>,
+        board_saved: &Board<Option<Piece>>,
+    ) {
+        // legal castling condition:
+        // A player may not castle out of, through, or into check.
+
+        if self.board[from.0][from.1].unwrap().get_piece_type() != PieceType::King {
+            return;
+        }
+
+        for x_dir in [-1, 1] {
+            let castling_dst = (from.0 as i32 + x_dir * 2, from.1 as i32);
+
+            if !Chess::is_position_in_bound(castling_dst) {
+                continue;
+            };
+
+            let castling = &mut moves[castling_dst.0 as usize][castling_dst.1 as usize];
+
+            if !*castling {
+                continue;
+            };
+
+            // move the king one cell at a time towards the castling destination
+            // and see if it's in check
+            for x in 0..2 {
+                let to = ((from.0 as i32 + x_dir * x) as usize, from.1);
+
+                self.move_piece(from, to);
+
+                if self.is_in_check(self.current_turn_color) {
+                    *castling = false;
+                }
+
+                self.board = *board_saved;
+            }
+        }
     }
 
     fn is_in_check(&self, color: PieceColor) -> bool {
