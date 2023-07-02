@@ -198,20 +198,18 @@ impl Chess {
         None
     }
 
-    // move piece and return eliminated piece and its position if exists (return position for en passant's special case)
     fn move_piece(
         &mut self,
         from: (usize, usize),
         to: (usize, usize),
-    ) -> (Option<Piece>, (usize, usize)) {
+    ) {
         let mut src = self.board[from.0][from.1];
 
         let Some(src_piece) = &mut src else { panic!("{:?} should contain a piece", from) };
 
         src_piece.set_has_moved(true);
 
-        let mut eliminated = self.board[to.0][to.1];
-        let mut eliminated_position = to;
+        let mut attacking_position = to;
 
         // handle special case: en passant
         if let PieceType::Pawn { en_passant } = src_piece.get_piece_type_mut() {
@@ -223,8 +221,7 @@ impl Chess {
                     enemy.get_color() != src_piece.get_color()
                         && matches!(enemy.get_piece_type(), PieceType::Pawn { en_passant: true })
                 }) {
-                    eliminated = en_passant_target;
-                    eliminated_position = (to.0, from.1);
+                    attacking_position = (to.0, from.1);
                 }
             } else if from.1.abs_diff(to.1) == 2 {
                 // if the pawn moves 2 cells vertically
@@ -235,10 +232,8 @@ impl Chess {
         }
 
         self.board[from.0][from.1] = None;
-        self.board[eliminated_position.0][eliminated_position.1] = None;
+        self.board[attacking_position.0][attacking_position.1] = None;
         self.board[to.0][to.1] = src;
-
-        (eliminated, eliminated_position)
     }
 
     // compute and populate each piece's legal moves
@@ -262,6 +257,7 @@ impl Chess {
 
     fn eliminate_illegal_moves(&mut self, from: (usize, usize)) {
         let mut moves = self.legal_moves[from.0][from.1];
+        let board_saved = self.board;
 
         for to_x in 0..BOARD_WIDTH {
             for to_y in 0..BOARD_HEIGHT {
@@ -272,17 +268,14 @@ impl Chess {
                 }
 
                 // temporarily move the piece to the destination
-                let original_piece = self.board[from.0][from.1];
-                let (eliminated_piece, eliminated_ind) = self.move_piece(from, to);
+                self.move_piece(from, to);
 
                 if self.is_in_check(self.current_turn_color) {
                     moves[to.0][to.1] = false;
                 }
 
                 // recover the original state
-                self.board[from.0][from.1] = original_piece;
-                self.board[to.0][to.1] = None;
-                self.board[eliminated_ind.0][eliminated_ind.1] = eliminated_piece;
+                self.board = board_saved;
             }
         }
 
