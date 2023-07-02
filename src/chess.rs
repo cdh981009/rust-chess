@@ -198,11 +198,7 @@ impl Chess {
         None
     }
 
-    fn move_piece(
-        &mut self,
-        from: (usize, usize),
-        to: (usize, usize),
-    ) {
+    fn move_piece(&mut self, from: (usize, usize), to: (usize, usize)) {
         let mut src = self.board[from.0][from.1];
 
         let Some(src_piece) = &mut src else { panic!("{:?} should contain a piece", from) };
@@ -211,29 +207,58 @@ impl Chess {
 
         let mut attacking_position = to;
 
-        // handle special case: en passant
-        if let PieceType::Pawn { en_passant } = src_piece.get_piece_type_mut() {
-            if from.0 != to.0 {
-                // if the pawn moves diagonally, check for en passant attack
-                let en_passant_target = self.board[to.0][from.1];
-
-                if en_passant_target.is_some_and(|enemy| {
-                    enemy.get_color() != src_piece.get_color()
-                        && matches!(enemy.get_piece_type(), PieceType::Pawn { en_passant: true })
-                }) {
-                    attacking_position = (to.0, from.1);
-                }
-            } else if from.1.abs_diff(to.1) == 2 {
-                // if the pawn moves 2 cells vertically
-                //      then it's its first move
-                //           enable en passant for the next turn
-                *en_passant = true;
-            }
-        }
+        // handle special moves
+        self.move_en_passant(from, to, src_piece, &mut attacking_position);
+        self.move_castling(from, to, src_piece);
 
         self.board[from.0][from.1] = None;
         self.board[attacking_position.0][attacking_position.1] = None;
         self.board[to.0][to.1] = src;
+    }
+
+    fn move_castling(&mut self, from: (usize, usize), to: (usize, usize), src_piece: &mut Piece) {
+        let is_castling =
+            (src_piece.get_piece_type() == PieceType::King) && (from.0.abs_diff(to.0) == 2);
+
+        if !is_castling {
+            return;
+        };
+
+        let rook_x = if to.0 > from.0 { BOARD_WIDTH - 1 } else { 0 };
+        let rook_new_x = if to.0 > from.0 { to.0 - 1 } else { to.0 + 1 };
+
+        let mut rook = self.board[rook_x][from.1].expect("cell should not be empty");
+        self.board[rook_x][from.1] = None;
+
+        rook.set_has_moved(true);
+        self.board[rook_new_x][from.1] = Some(rook);
+    }
+
+    fn move_en_passant(
+        &mut self,
+        from: (usize, usize),
+        to: (usize, usize),
+        src_piece: &mut Piece,
+        attacking_position: &mut (usize, usize),
+    ) {
+        let PieceType::Pawn { en_passant } = src_piece.get_piece_type_mut() else { return };
+
+        if from.0 != to.0 {
+            // if the pawn moves diagonally, check for en passant attack
+            let en_passant_target = self.board[to.0][from.1];
+
+            if en_passant_target.is_some_and(|enemy| {
+                enemy.get_color() != src_piece.get_color()
+                    && matches!(enemy.get_piece_type(), PieceType::Pawn { en_passant: true })
+            }) {
+                *attacking_position = (to.0, from.1);
+            }
+        } else if from.1.abs_diff(to.1) == 2 {
+            // if the pawn moves 2 cells vertically
+            //      then it's its first move
+            //           enable en passant for the next turn
+            *en_passant = true;
+        }
     }
 
     // compute and populate each piece's legal moves

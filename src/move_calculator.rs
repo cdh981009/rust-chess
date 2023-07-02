@@ -1,4 +1,5 @@
-use crate::chess::{Board, Chess};
+use crate::chess::{Board, Chess, BOARD_HEIGHT, BOARD_WIDTH};
+use crate::game::Assets;
 use crate::piece::*;
 
 pub fn get_moves(board: &Board<Option<Piece>>, ind: (usize, usize), moves: &mut Board<bool>) {
@@ -61,7 +62,8 @@ fn get_pawn_moves(
         let ind = (nx as usize, ny as usize);
 
         let is_directly_attackable = Chess::is_color_on(board, ind, enemy_color);
-        let can_en_passant = board[ind.0][y].is_some_and(|piece| { // check x-adjacent cell
+        let can_en_passant = board[ind.0][y].is_some_and(|piece| {
+            // check x-adjacent cell
             matches!(piece.get_piece_type(), PieceType::Pawn { en_passant: true })
         });
 
@@ -145,8 +147,6 @@ fn get_king_moves(
     (x, y): (usize, usize),
     moves: &mut Board<bool>,
 ) {
-    // todo: castling
-
     let enemy_color = piece.get_color().get_enemy_color();
 
     for move_x in -1..=1 {
@@ -167,6 +167,50 @@ fn get_king_moves(
             }
         }
     }
+
+    // special case: castling
+    if !piece.has_moved() {
+        // note that this rank is not the same as real chess rank,
+        // which starts from the bottom and begins with 1
+        let rank = if piece.get_color() == PieceColor::White {
+            BOARD_HEIGHT - 1
+        } else {
+            0
+        };
+
+        assert_eq!((x, y), (4, rank), "king cannot exist at {:?}", (x, y));
+
+        // king side
+        moves[x + 2][y] = can_castle(board, (x, y), 1);
+       // queen side
+        moves[x - 2][y] = can_castle(board, (x, y), -1);
+    }
+}
+
+fn can_castle(
+    board: &Board<Option<Piece>>,
+    (x, y): (usize, usize),
+    x_dir: i32,
+) -> bool {
+    let mut nx = x;
+
+    let is_castlable_rook = |cell: &Option<Piece>| -> bool {
+        cell.is_some_and(|piece| piece.get_piece_type() == PieceType::Rook && !piece.has_moved())
+    };
+
+    loop {
+        nx = (nx as i32 + x_dir) as usize;
+
+        if nx == 0 || nx == BOARD_WIDTH - 1 {
+            break;
+        }
+
+        if !Chess::is_empty_on(board, (nx, y)) {
+            return false;
+        }
+    }
+
+    return is_castlable_rook(&board[nx][y]);
 }
 
 fn get_moves_in_direction(
