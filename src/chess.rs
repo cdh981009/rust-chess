@@ -325,21 +325,9 @@ impl Chess {
         let kings_position = kings_position.expect("king not found in the board");
         let enemy_color = color.get_enemy_color();
 
-        // get all psuedo-legal moves of the enemy (moves that doesn't consider check)
-        let mut enemy_moves = [[false; BOARD_HEIGHT]; BOARD_WIDTH];
+        let enemy_attacks = move_calculator::get_all_attacks(&self.board, enemy_color);
 
-        for x in 0..BOARD_WIDTH {
-            for y in 0..BOARD_HEIGHT {
-                let Some(piece) = self.board[x][y] else { continue };
-                if piece.get_color() != enemy_color {
-                    continue;
-                };
-
-                move_calculator::get_moves(&self.board, (x, y), &mut enemy_moves);
-            }
-        }
-
-        enemy_moves[kings_position.0][kings_position.1]
+        enemy_attacks[kings_position.0][kings_position.1]
     }
 
     fn post_move_update(&mut self) {

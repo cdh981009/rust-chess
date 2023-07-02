@@ -16,6 +16,23 @@ pub fn get_moves(board: &Board<Option<Piece>>, ind: (usize, usize), moves: &mut 
     }
 }
 
+pub fn get_all_attacks(board: &Board<Option<Piece>>, enemy_color: PieceColor) -> Board<bool> {
+    let mut enemy_attacks = [[false; BOARD_HEIGHT]; BOARD_WIDTH];
+
+    for x in 0..BOARD_WIDTH {
+        for y in 0..BOARD_HEIGHT {
+            let Some(piece) = board[x][y] else { continue };
+            if piece.get_color() != enemy_color {
+                continue;
+            };
+
+            get_moves(board, (x, y), &mut enemy_attacks);
+        }
+    }
+
+    enemy_attacks
+}
+
 fn get_pawn_moves(
     piece: &Piece,
     board: &Board<Option<Piece>>,
