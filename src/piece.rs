@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ggez::{Context, graphics::Image};
+use ggez::{graphics::Image, Context};
 
 use crate::game::Assets;
 
@@ -44,6 +44,18 @@ impl Piece {
 
     pub fn set_has_moved(&mut self, has_moved: bool) {
         self.has_moved = has_moved;
+    }
+
+    pub fn promote(&mut self, promote_to: PieceType) {
+        if !matches!(self.get_piece_type(), PieceType::Pawn { .. }) {
+            panic!("{self} cannot promote");
+        }
+
+        if promote_to == PieceType::King {
+            panic!("cannot promote to King");
+        }
+
+        self.piece_type = promote_to;
     }
 }
 

@@ -380,17 +380,31 @@ impl Chess {
     }
 
     fn post_move_update(&mut self) {
-        for cell in self.board.iter_mut().flatten() {
-            let Some(piece) = cell else { continue };
+        for x in 0..BOARD_WIDTH {
+            for y in 0..BOARD_HEIGHT {
+                let Some(piece) = &mut self.board[x][y] else { continue };
 
-            // update en passant
-            match (piece.get_color(), piece.get_piece_type_mut()) {
-                (color, PieceType::Pawn { en_passant })
-                    if color == self.current_turn_color.get_enemy_color() =>
-                {
-                    *en_passant = false;
+                // update en passant
+                match (piece.get_color(), piece.get_piece_type_mut()) {
+                    (color, PieceType::Pawn { en_passant })
+                        if color == self.current_turn_color.get_enemy_color() =>
+                    {
+                        *en_passant = false;
+                    }
+                    _ => {}
                 }
-                _ => {}
+
+                // update promotion
+                let promotionable_row = match piece.get_color() {
+                    PieceColor::White => 0,
+                    PieceColor::Black => BOARD_HEIGHT - 1,
+                };
+
+                if matches!(piece.get_piece_type(), PieceType::Pawn { en_passant: _ })
+                    && y == promotionable_row
+                {
+                    piece.promote(PieceType::Queen);
+                }
             }
         }
     }
