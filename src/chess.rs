@@ -6,22 +6,128 @@ use ggez::{
     *,
 };
 
-use crate::move_calculator;
-use crate::piece::*;
-use crate::{game::*, WINDOW_WIDTH};
+use crate::{game::*, move_calculator, piece::*, WINDOW_HEIGHT, WINDOW_WIDTH};
 
 pub const BOARD_WIDTH: usize = 8;
 pub const BOARD_HEIGHT: usize = 8;
-pub const BOARD_SIZE_1D: usize = BOARD_WIDTH * BOARD_HEIGHT;
+const CELL_SIZE: f32 = 80.0;
 
 pub type Board<T> = [[T; BOARD_HEIGHT]; BOARD_WIDTH];
 
 #[derive(PartialEq)]
 enum TurnState {
     Normal,
+    Promoting,
     Check,
     Checkmate,
     Stalemate,
+}
+
+#[derive(PartialEq)]
+enum PromoterState {
+    Idle,
+    Promoting,
+}
+
+struct Promoter {
+    state: PromoterState,
+    cell: Option<(usize, usize)>,
+    color: Option<PieceColor>,
+
+    position: Vec2,
+}
+
+impl Promoter {
+    const PROMOTION_PIECES: [PieceType; 4] = [
+        PieceType::Queen,
+        PieceType::Knight,
+        PieceType::Rook,
+        PieceType::Bishop,
+    ];
+
+    fn new(position: Vec2) -> Self {
+        Promoter {
+            state: PromoterState::Idle,
+            cell: None,
+            color: None,
+
+            position,
+        }
+    }
+
+    fn is_promoting(&self) -> bool {
+        self.state == PromoterState::Promoting
+    }
+
+    fn register_promotion(&mut self, cell: (usize, usize), color: PieceColor) {
+        self.state = PromoterState::Promoting;
+        self.cell = Some(cell);
+        self.color = Some(color);
+
+        self.state = PromoterState::Promoting;
+    }
+
+    fn choose_promotion(&mut self, mouse: &Mouse) -> Option<((usize, usize), PieceType)> {
+        if self.state == PromoterState::Idle {
+            return None;
+        }
+
+        if !mouse.is_mouse_pressed(event::MouseButton::Left) {
+            return None;
+        }
+
+        let m_pos = mouse.get_mouse();
+        let cell = ((m_pos - self.position) / CELL_SIZE).floor();
+
+        let (x, y) = (cell.x as i32, cell.y as i32);
+
+        let is_in_bound = x >= 0 && x < 4 && y == 0;
+
+        if !is_in_bound {
+            return None;
+        }
+
+        let result = Some((self.cell.unwrap(), Self::PROMOTION_PIECES[x as usize]));
+
+        self.state = PromoterState::Idle;
+        self.cell = None;
+        self.color = None;
+
+        result
+    }
+
+    fn draw(
+        &self,
+        ctx: &mut Context,
+        canvas: &mut graphics::Canvas,
+        assets: &mut Assets,
+    ) -> GameResult {
+        if self.state == PromoterState::Idle {
+            return Ok(());
+        }
+
+        let sprite_original_size = 460.0;
+
+        for (x, piece_type) in Self::PROMOTION_PIECES.iter().enumerate() {
+            let piece = Piece::new(*piece_type, self.color.unwrap());
+
+            // set pos to the center of the cell
+            let cell_pos = self.position + vec2(CELL_SIZE * x as f32, 0.);
+            let cell_pos_centered = cell_pos + vec2(CELL_SIZE / 2.0, CELL_SIZE / 2.0);
+
+            let image = piece.get_image(ctx, assets);
+            let drawparams = graphics::DrawParam::new()
+                .dest(cell_pos_centered)
+                .offset([0.5, 0.5]) // offset so that the sprite center and the drawing position align
+                .scale([
+                    CELL_SIZE / sprite_original_size,
+                    CELL_SIZE / sprite_original_size,
+                ]);
+            canvas.draw(image, drawparams);
+        }
+
+        Ok(())
+    }
 }
 
 pub struct Chess {
@@ -33,16 +139,14 @@ pub struct Chess {
     current_turn_color: PieceColor,
     turn_state: TurnState,
     is_moves_computed: bool,
+    promoter: Promoter,
 
     // fields for drawing
     position: Vec2,
-    cell_size: f32,
 }
 
 impl Chess {
     pub fn new(position: Vec2) -> Self {
-        let cell_size = 80.0;
-
         Chess {
             board: [[None; BOARD_HEIGHT]; BOARD_WIDTH],
             selected_cell: None,
@@ -51,9 +155,12 @@ impl Chess {
             current_turn_color: PieceColor::White,
             turn_state: TurnState::Normal,
             is_moves_computed: false,
+            promoter: Promoter::new(vec2(
+                WINDOW_WIDTH / 2. - 2. * CELL_SIZE,
+                WINDOW_HEIGHT - CELL_SIZE,
+            )),
 
             position,
-            cell_size,
         }
     }
 
@@ -136,6 +243,19 @@ impl Chess {
             return;
         }
 
+        if self.promoter.is_promoting() {
+            let Some((cell, chosen)) = self.promoter.choose_promotion(mouse) else {
+                return;
+            };
+
+            self.board[cell.0][cell.1]
+                .as_mut()
+                .expect("the given cell should contain a pawn")
+                .promote(chosen);
+
+            return;
+        }
+
         if mouse.is_mouse_pressed(event::MouseButton::Left) {
             let cell = self.try_select_cell(mouse);
 
@@ -187,7 +307,7 @@ impl Chess {
 
     fn try_select_cell(&self, mouse: &Mouse) -> Option<(usize, usize)> {
         let m_pos = mouse.get_mouse();
-        let cell = ((m_pos - self.position) / self.cell_size).floor();
+        let cell = ((m_pos - self.position) / CELL_SIZE).floor();
 
         let (x, y) = (cell.x as i32, cell.y as i32);
 
@@ -403,7 +523,7 @@ impl Chess {
                 if matches!(piece.get_piece_type(), PieceType::Pawn { en_passant: _ })
                     && y == promotionable_row
                 {
-                    piece.promote(PieceType::Queen);
+                    self.promoter.register_promotion((x, y), piece.get_color());
                 }
             }
         }
@@ -441,8 +561,10 @@ impl Chess {
         assets: &mut Assets,
     ) -> GameResult {
         self.draw_turn_state(canvas);
-        self.draw_board(canvas, self.position, self.cell_size);
-        self.draw_pieces(ctx, canvas, assets, self.position, self.cell_size);
+        self.draw_board(canvas, self.position, CELL_SIZE);
+        self.draw_pieces(ctx, canvas, assets, self.position, CELL_SIZE);
+
+        self.promoter.draw(ctx, canvas, assets)?;
 
         Ok(())
     }
@@ -462,6 +584,7 @@ impl Chess {
 
         let current_state_text = match self.turn_state {
             TurnState::Normal => "Normal",
+            TurnState::Promoting => "Promotion",
             TurnState::Check => "Check",
             TurnState::Checkmate => "Checkmate",
             TurnState::Stalemate => "Stalemate",
