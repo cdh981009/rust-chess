@@ -17,22 +17,16 @@ pub type Board<T> = [[T; BOARD_HEIGHT]; BOARD_WIDTH];
 #[derive(PartialEq)]
 enum TurnState {
     Normal,
-    Promoting,
+    Promotion(Promoter),
     Check,
     Checkmate,
     Stalemate,
 }
 
 #[derive(PartialEq)]
-enum PromoterState {
-    Idle,
-    Promoting,
-}
-
 struct Promoter {
-    state: PromoterState,
-    cell: Option<(usize, usize)>,
-    color: Option<PieceColor>,
+    cell: (usize, usize),
+    color: PieceColor,
 
     position: Vec2,
 }
@@ -45,33 +39,17 @@ impl Promoter {
         PieceType::Bishop,
     ];
 
-    fn new(position: Vec2) -> Self {
+    fn new(position: Vec2, cell: (usize, usize), color: PieceColor) -> Self {
         Promoter {
-            state: PromoterState::Idle,
-            cell: None,
-            color: None,
+            cell,
+            color,
 
             position,
         }
     }
 
-    fn is_promoting(&self) -> bool {
-        self.state == PromoterState::Promoting
-    }
-
-    fn register_promotion(&mut self, cell: (usize, usize), color: PieceColor) {
-        self.state = PromoterState::Promoting;
-        self.cell = Some(cell);
-        self.color = Some(color);
-
-        self.state = PromoterState::Promoting;
-    }
-
-    fn choose_promotion(&mut self, mouse: &Mouse) -> Option<((usize, usize), PieceType)> {
-        if self.state == PromoterState::Idle {
-            return None;
-        }
-
+    // return None until player chooses
+    fn choose_promotion(&self, mouse: &Mouse) -> Option<PieceType> {
         if !mouse.is_mouse_pressed(event::MouseButton::Left) {
             return None;
         }
@@ -87,13 +65,7 @@ impl Promoter {
             return None;
         }
 
-        let result = Some((self.cell.unwrap(), Self::PROMOTION_PIECES[x as usize]));
-
-        self.state = PromoterState::Idle;
-        self.cell = None;
-        self.color = None;
-
-        result
+        Some(Self::PROMOTION_PIECES[x as usize])
     }
 
     fn draw(
@@ -102,14 +74,10 @@ impl Promoter {
         canvas: &mut graphics::Canvas,
         assets: &mut Assets,
     ) -> GameResult {
-        if self.state == PromoterState::Idle {
-            return Ok(());
-        }
-
         let sprite_original_size = 460.0;
 
         for (x, piece_type) in Self::PROMOTION_PIECES.iter().enumerate() {
-            let piece = Piece::new(*piece_type, self.color.unwrap());
+            let piece = Piece::new(*piece_type, self.color);
 
             // set pos to the center of the cell
             let cell_pos = self.position + vec2(CELL_SIZE * x as f32, 0.);
@@ -130,16 +98,32 @@ impl Promoter {
     }
 }
 
+struct TurnInfo {
+    state: TurnState,
+    color: PieceColor,
+}
+
+impl TurnInfo {
+    fn new() -> Self {
+        TurnInfo {
+            state: TurnState::Normal,
+            color: PieceColor::White,
+        }
+    }
+}
+
 pub struct Chess {
     // fields for game logic
     board: Board<Option<Piece>>,
     selected_cell: Option<(usize, usize)>,
+
     legal_moves: Board<Board<bool>>,
     is_movable: Board<bool>,
-    current_turn_color: PieceColor,
-    turn_state: TurnState,
-    is_moves_computed: bool,
-    promoter: Promoter,
+
+    turn_info: TurnInfo,
+    change_turn: bool,
+
+    promoter_position: Vec2,
 
     // fields for drawing
     position: Vec2,
@@ -150,15 +134,14 @@ impl Chess {
         Chess {
             board: [[None; BOARD_HEIGHT]; BOARD_WIDTH],
             selected_cell: None,
+
             legal_moves: [[[[false; BOARD_HEIGHT]; BOARD_WIDTH]; BOARD_HEIGHT]; BOARD_WIDTH],
             is_movable: [[false; BOARD_HEIGHT]; BOARD_WIDTH],
-            current_turn_color: PieceColor::White,
-            turn_state: TurnState::Normal,
-            is_moves_computed: false,
-            promoter: Promoter::new(vec2(
-                WINDOW_WIDTH / 2. - 2. * CELL_SIZE,
-                WINDOW_HEIGHT - CELL_SIZE,
-            )),
+
+            turn_info: TurnInfo::new(),
+            change_turn: false,
+
+            promoter_position: vec2(WINDOW_WIDTH / 2.0 - 2.0 * CELL_SIZE, WINDOW_HEIGHT - CELL_SIZE),
 
             position,
         }
@@ -201,6 +184,8 @@ impl Chess {
 
         self.print();
 
+        self.compute_moves();
+
         self
     }
 
@@ -220,31 +205,34 @@ impl Chess {
         }
     }
 
+    fn compute_moves(&mut self) {
+        self.compute_each_legal_moves();
+        self.compute_is_movable();
+
+        // if no legal moves for all pieces
+        //      if inCheck
+        //          then checkmate -> current color loses
+        //      else
+        //          then stalemate -> draw
+
+        if !self.is_movable.iter().any(|row| row.contains(&true)) {
+            self.turn_info.state = if self.turn_info.state == TurnState::Check {
+                TurnState::Checkmate
+            } else {
+                TurnState::Stalemate
+            };
+        }
+    }
+
     pub fn update(&mut self, mouse: &Mouse) {
-        if !self.is_moves_computed {
-            self.compute_each_legal_moves();
-            self.compute_is_movable();
-            self.is_moves_computed = true;
-
-            // if no legal moves for all pieces
-            //      if inCheck
-            //          then checkmate -> current color loses
-            //      else
-            //          then stalemate -> draw
-
-            if !self.is_movable.iter().any(|row| row.contains(&true)) {
-                self.turn_state = if self.turn_state == TurnState::Check {
-                    TurnState::Checkmate
-                } else {
-                    TurnState::Stalemate
-                };
-            }
-
-            return;
+        if self.change_turn {
+            self.change_turn();
         }
 
-        if self.promoter.is_promoting() {
-            let Some((cell, chosen)) = self.promoter.choose_promotion(mouse) else {
+        if let TurnState::Promotion(promoter) = &self.turn_info.state {
+            let cell = promoter.cell;
+
+            let Some(chosen) = (*promoter).choose_promotion(mouse) else {
                 return;
             };
 
@@ -253,9 +241,11 @@ impl Chess {
                 .expect("the given cell should contain a pawn")
                 .promote(chosen);
 
+            self.change_turn = true;
+
             return;
         }
-
+        
         if mouse.is_mouse_pressed(event::MouseButton::Left) {
             let cell = self.try_select_cell(mouse);
 
@@ -269,7 +259,6 @@ impl Chess {
                     // move the piece and change the turn
                     self.move_piece(self.selected_cell.unwrap(), (cell_x, cell_y));
                     self.post_move_update();
-                    self.change_turn();
                 } else {
                     // select new piece on this cell
                     self.selected_cell = cell;
@@ -389,7 +378,7 @@ impl Chess {
         // iterate each piece of current turn and compute its legal moves
         for x in 0..BOARD_WIDTH {
             for y in 0..BOARD_HEIGHT {
-                if !Chess::is_color_on(&self.board, (x, y), self.current_turn_color) {
+                if !Chess::is_color_on(&self.board, (x, y), self.turn_info.color) {
                     continue;
                 }
 
@@ -419,7 +408,7 @@ impl Chess {
                 // temporarily move the piece to the destination
                 self.move_piece(from, to);
 
-                if self.is_in_check(self.current_turn_color) {
+                if self.is_in_check(self.turn_info.color) {
                     moves[to.0][to.1] = false;
                 }
 
@@ -467,7 +456,7 @@ impl Chess {
 
                 self.move_piece(from, to);
 
-                if self.is_in_check(self.current_turn_color) {
+                if self.is_in_check(self.turn_info.color) {
                     *castling = false;
                 }
 
@@ -500,6 +489,8 @@ impl Chess {
     }
 
     fn post_move_update(&mut self) {
+        let mut delay_turn = false;
+
         for x in 0..BOARD_WIDTH {
             for y in 0..BOARD_HEIGHT {
                 let Some(piece) = &mut self.board[x][y] else { continue };
@@ -507,7 +498,7 @@ impl Chess {
                 // update en passant
                 match (piece.get_color(), piece.get_piece_type_mut()) {
                     (color, PieceType::Pawn { en_passant })
-                        if color == self.current_turn_color.get_enemy_color() =>
+                        if color == self.turn_info.color.get_enemy_color() =>
                     {
                         *en_passant = false;
                     }
@@ -523,23 +514,37 @@ impl Chess {
                 if matches!(piece.get_piece_type(), PieceType::Pawn { en_passant: _ })
                     && y == promotionable_row
                 {
-                    self.promoter.register_promotion((x, y), piece.get_color());
+                    let promoter = Promoter::new(
+                        self.promoter_position,
+                        (x, y),
+                        piece.get_color(),
+                    );
+
+                    self.turn_info.state = TurnState::Promotion(promoter);
+
+                    delay_turn = true;
                 }
             }
+        }
+
+        if !delay_turn {
+            self.change_turn = true;
         }
     }
 
     fn change_turn(&mut self) {
-        self.current_turn_color = self.current_turn_color.get_enemy_color();
+        self.change_turn = false;
+
+        self.turn_info.color = self.turn_info.color.get_enemy_color();
         self.selected_cell = None;
 
-        self.turn_state = if self.is_in_check(self.current_turn_color) {
+        self.turn_info.state = if self.is_in_check(self.turn_info.color) {
             TurnState::Check
         } else {
             TurnState::Normal
         };
 
-        self.is_moves_computed = false;
+        self.compute_moves();
     }
 
     fn compute_is_movable(&mut self) {
@@ -564,7 +569,9 @@ impl Chess {
         self.draw_board(canvas, self.position, CELL_SIZE);
         self.draw_pieces(ctx, canvas, assets, self.position, CELL_SIZE);
 
-        self.promoter.draw(ctx, canvas, assets)?;
+        if let TurnState::Promotion(promoter) = &self.turn_info.state {
+            (*promoter).draw(ctx, canvas, assets)?;
+        }
 
         Ok(())
     }
@@ -572,7 +579,7 @@ impl Chess {
     fn draw_turn_state(&self, canvas: &mut graphics::Canvas) {
         let turn_text = graphics::Text::new(format!(
             "{}'s turn",
-            if self.current_turn_color == PieceColor::White {
+            if self.turn_info.color == PieceColor::White {
                 "White"
             } else {
                 "Black"
@@ -582,15 +589,15 @@ impl Chess {
         .set_scale(32.)
         .clone();
 
-        let current_state_text = match self.turn_state {
+        let mut state_text = match self.turn_info.state {
             TurnState::Normal => "Normal",
-            TurnState::Promoting => "Promotion",
+            TurnState::Promotion(..) => "Promote",
             TurnState::Check => "Check",
             TurnState::Checkmate => "Checkmate",
             TurnState::Stalemate => "Stalemate",
         };
 
-        let check_text = graphics::Text::new(current_state_text)
+        let check_text = graphics::Text::new(state_text)
             .set_scale(32.)
             .set_layout(TextLayout {
                 // right align
@@ -604,7 +611,7 @@ impl Chess {
             graphics::DrawParam::from(vec2(15., 15.)).color(graphics::Color::from((0, 0, 0, 255))),
         );
 
-        if self.turn_state != TurnState::Normal {
+        if self.turn_info.state != TurnState::Normal {
             canvas.draw(
                 &check_text,
                 graphics::DrawParam::from(vec2(WINDOW_WIDTH - 15., 15.))
@@ -635,6 +642,15 @@ impl Chess {
 
                 // draw checker pattern
                 canvas.draw(&graphics::Quad, param.color(color));
+
+                if let TurnState::Promotion(promoter) = &self.turn_info.state {
+                    if promoter.cell == (cell_x, cell_y) {
+                        canvas.draw(&graphics::Quad, param.color(select_color));
+                    }
+
+                    // skip rest of default highlight drawing
+                    continue;
+                }
 
                 // draw transparent highlight on the selected cell and its movable cells
                 let is_selected_cell = self
